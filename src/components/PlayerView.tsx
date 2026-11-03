@@ -757,8 +757,8 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
         </div>
       </div>
 
-      {/* Main Streaming Iframe Container with Permissive Setup (Plays directly on page) */}
-      <div className="relative flex-1 w-full bg-black flex items-center justify-center overflow-hidden min-h-[60vh] sm:min-h-[75vh]">
+      {/* Main Streaming Iframe Container with Permissive Setup (Plays directly on page across Phone, Tablet, Laptop, TV) */}
+      <div className="relative flex-1 w-full bg-black flex items-center justify-center overflow-hidden aspect-video sm:aspect-auto sm:min-h-[75vh]">
         <iframe
           key={`${iframeKey}-${streamUrl}-${currentQuality}`}
           src={streamUrl}
@@ -767,7 +767,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
           allowFullScreen
           referrerPolicy="origin"
           onError={() => handlePlaybackErrorNotice('Stream connection failed')}
-          className="w-full h-full min-h-[60vh] sm:min-h-[75vh] border-0 bg-black"
+          className="w-full h-full border-0 bg-black"
         />
       </div>
 

@@ -15,7 +15,7 @@ export const HERO_FEATURED_ITEMS: MediaItem[] = [
     totalSeasons: 2,
     overview: 'The acclaimed fantasy epic streaming on JioHotstar. Kind-hearted Ali Baba from Kabul discovers a mythical treasure cave and uses courage and wit to battle forty fearsome phantom thieves.',
     featured: true,
-    aliases: ['ali baba', 'ali baba aur 40 bhoot', '40 bhoot', 'ali baba hotstar', 'jio hotstar ali baba', 'dastaan e kabul', 'ali baba dastaan e kabul'],
+    aliases: ['ali baba', 'ali baba aur 40 bhoot', '40 bhoot', 'ali baba hotstar', 'jio hotstar ali baba', 'dastaan e kabul', 'ali baba dastaan e kabul', 'अली बाबा', 'अली बाबा और 40 भूत', 'अलीबाबा और 40 भूत', 'अलीबाबा और चालीस भूत', 'चालीस भूत'],
   },
   {
     id: '101352',
@@ -31,7 +31,7 @@ export const HERO_FEATURED_ITEMS: MediaItem[] = [
     totalSeasons: 4,
     overview: 'All 4 Seasons Complete. Engineering graduate Abhishek Tripathi works as Panchayat secretary in Phulera village, navigating comic rural politics, election fever, and heartwarming relationships.',
     featured: true,
-    aliases: ['panchayat', 'phulera', 'jeetu bhaiya', 'sachiv ji', 'panchayat season 4', 'panchayat 4', 'panchayat season 3', 'panchayat 3'],
+    aliases: ['panchayat', 'phulera', 'jeetu bhaiya', 'sachiv ji', 'panchayat season 4', 'panchayat 4', 'panchayat season 3', 'panchayat 3', 'पंचायत', 'पंचायत 4', 'पंचायत 3', 'पंचायत सीजन 4', 'फुलेरा', 'सचिव जी'],
   },
   {
     id: '290138',
@@ -47,7 +47,7 @@ export const HERO_FEATURED_ITEMS: MediaItem[] = [
     totalSeasons: 1,
     overview: 'TVF Rural Comedy Drama by the creators of Panchayat. A young MBBS doctor takes charge of the Bhatkandi rural Primary Health Centre and navigates village politics and humorous dilemmas.',
     featured: true,
-    aliases: ['gramchitshalay', 'gram chikitsalay', 'gram chitshalay', 'tvf gram', 'gram chikitsa'],
+    aliases: ['gramchitshalay', 'gram chikitsalay', 'gram chitshalay', 'tvf gram', 'gram chikitsa', 'ग्राम चिकित्सालय', 'ग्राम चिकत्सलय', 'ग्राम चिकित्‍सालय'],
   },
   {
     id: '313172',
@@ -63,7 +63,7 @@ export const HERO_FEATURED_ITEMS: MediaItem[] = [
     totalSeasons: 1,
     overview: 'A heartwarming Indian slice-of-life comedy series focusing on quirky families and colorful neighbors in Chumbak Colony, navigating hilarious misunderstandings and neighborhood camaraderie.',
     featured: true,
-    aliases: ['chumbak', 'chumbak series', 'chumbak colony'],
+    aliases: ['chumbak', 'chumbak series', 'chumbak colony', 'चुंबक'],
   },
   {
     id: '84105',
@@ -79,7 +79,7 @@ export const HERO_FEATURED_ITEMS: MediaItem[] = [
     totalSeasons: 3,
     overview: 'The iron-fisted battle for the throne of Purvanchal. Akhandanand Tripathi rules the underworld, while Guddu and Bablu Pandit challenge their criminal dominion.',
     featured: true,
-    aliases: ['mirjapur', 'mirzapur', 'mirza pur', 'kaleen bhaiya', 'guddu bhaiya', 'munna bhaiya'],
+    aliases: ['mirjapur', 'mirzapur', 'mirza pur', 'kaleen bhaiya', 'guddu bhaiya', 'munna bhaiya', 'मिर्जापुर', 'मिर्ज़ापुर', 'कालीन भैया', 'गुड्डू भैया', 'मुन्ना भैया'],
   },
   {
     id: '124151',
@@ -95,7 +95,7 @@ export const HERO_FEATURED_ITEMS: MediaItem[] = [
     totalSeasons: 2,
     overview: 'ZEE5 Original Blockbuster starring Sunil Grover. A quirky residential society is thrown into chaos by an unsolved murder, leading to comical twists.',
     featured: true,
-    aliases: ['sunflower', 'sunflower season 2', 'sunil grover', 'zee5 sunflower'],
+    aliases: ['sunflower', 'sunflower season 2', 'sunil grover', 'zee5 sunflower', 'सनफ्लावर', 'सनफ्लॉवर'],
   },
   {
     id: '1147710',
@@ -111,6 +111,7 @@ export const HERO_FEATURED_ITEMS: MediaItem[] = [
     duration: '2h 27m',
     overview: 'Highest Grossing Hindi Horror-Comedy. Sarkata terrorizes Chanderi, and Vicky and his crew must team up with Stree to save the town.',
     featured: true,
+    aliases: ['stree', 'stree 2', 'sarkata', 'rajkummar rao', 'स्त्री', 'स्त्री 2', 'स्त्री २', 'स्त्री दो', 'सरकटा'],
   },
 ];
 
@@ -126,7 +127,7 @@ export const NEW_2026_RELEASES: MediaItem[] = [
     poster: 'https://image.tmdb.org/t/p/w500/cYjdacskAhvWdjhxsSdhop1SxON.jpg',
     genres: ['Fantasy', 'Action', 'Comedy'],
     totalSeasons: 2,
-    aliases: ['ali baba', 'ali baba aur 40 bhoot', '40 bhoot', 'ali baba hotstar', 'jio hotstar ali baba'],
+    aliases: ['ali baba', 'ali baba aur 40 bhoot', '40 bhoot', 'ali baba hotstar', 'jio hotstar ali baba', 'अली बाबा', 'अली बाबा और 40 भूत', 'अलीबाबा और 40 भूत', 'चालीस भूत'],
   },
   {
     id: '101352',
@@ -139,7 +140,7 @@ export const NEW_2026_RELEASES: MediaItem[] = [
     poster: 'https://image.tmdb.org/t/p/w500/8ivTX5q2otqXvH815BcOhxVkTPW.jpg',
     genres: ['Comedy', 'Drama'],
     totalSeasons: 4,
-    aliases: ['panchayat', 'phulera', 'jeetu bhaiya', 'panchayat 4', 'panchayat season 4'],
+    aliases: ['panchayat', 'phulera', 'jeetu bhaiya', 'panchayat 4', 'panchayat season 4', 'पंचायत', 'पंचायत 4', 'पंचायत 3', 'फुलेरा'],
   },
   {
     id: '290138',
@@ -152,7 +153,7 @@ export const NEW_2026_RELEASES: MediaItem[] = [
     poster: 'https://image.tmdb.org/t/p/w500/peRHZYhvuA6MLTJkpf5nIjgsWx5.jpg',
     genres: ['Comedy', 'Drama'],
     totalSeasons: 1,
-    aliases: ['gramchitshalay', 'gram chikitsalay', 'tvf gram'],
+    aliases: ['gramchitshalay', 'gram chikitsalay', 'tvf gram', 'ग्राम चिकित्सालय', 'ग्राम चिकत्सलय'],
   },
   {
     id: '313172',
@@ -165,7 +166,7 @@ export const NEW_2026_RELEASES: MediaItem[] = [
     poster: 'https://image.tmdb.org/t/p/w500/r2TJ9s9uhfxTssar1gBAWcxIXx7.jpg',
     genres: ['Comedy', 'Family'],
     totalSeasons: 1,
-    aliases: ['chumbak', 'chumbak series'],
+    aliases: ['chumbak', 'chumbak series', 'चुंबक'],
   },
   {
     id: '124151',
@@ -178,7 +179,7 @@ export const NEW_2026_RELEASES: MediaItem[] = [
     poster: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=500&auto=format&fit=crop',
     genres: ['Comedy', 'Mystery'],
     totalSeasons: 2,
-    aliases: ['sunflower', 'sunflower season 2', 'sunil grover', 'zee5 sunflower'],
+    aliases: ['sunflower', 'sunflower season 2', 'sunil grover', 'zee5 sunflower', 'सनफ्लावर'],
   },
   {
     id: '84105',
@@ -191,6 +192,7 @@ export const NEW_2026_RELEASES: MediaItem[] = [
     poster: 'https://image.tmdb.org/t/p/w500/p0qM8hhlMF5DuxHBzl2EZR6TehX.jpg',
     genres: ['Crime', 'Action'],
     totalSeasons: 3,
+    aliases: ['mirjapur', 'mirzapur', 'mirza pur', 'kaleen bhaiya', 'मिर्जापुर', 'मिर्ज़ापुर', 'कालीन भैया'],
   },
   {
     id: '90471',
@@ -203,6 +205,7 @@ export const NEW_2026_RELEASES: MediaItem[] = [
     poster: 'https://m.media-amazon.com/images/M/MV5BN2E2YjdmOTctYTgyMi00NTYxLWIzOTYtYjBmOGU4YTcyNGY5XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg',
     genres: ['Comedy', 'Family'],
     totalSeasons: 4,
+    aliases: ['gullak', 'gullak 4', 'mishra parivar', 'tvf gullak', 'गुल्लक', 'गुल्लक 4'],
   },
   {
     id: '93405',
@@ -342,6 +345,7 @@ export const TRENDING_SERIES: MediaItem[] = [
     poster: 'https://m.media-amazon.com/images/M/MV5BMzRjZWVmMzItNTdmYS00OWEzLTgyOGUtNThiNTU2ZThlYjY0XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg',
     genres: ['Action', 'Comedy'],
     totalSeasons: 2,
+    aliases: ['family man', 'the family man', 'manoj bajpayee', 'srikant tiwari', 'फैमिली मैन', 'द फैमिली मैन'],
   },
   {
     id: '202167',
@@ -354,6 +358,7 @@ export const TRENDING_SERIES: MediaItem[] = [
     poster: 'https://m.media-amazon.com/images/M/MV5BZmQ2NDgyOGEtMTNjYi00MDhkLWJhOGUtNDlhNjZlZTc1ZDlhXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg',
     genres: ['Crime', 'Thriller'],
     totalSeasons: 1,
+    aliases: ['farzi', 'shahid kapoor', 'फर्जी'],
   },
   {
     id: '100911',
@@ -366,6 +371,7 @@ export const TRENDING_SERIES: MediaItem[] = [
     poster: 'https://m.media-amazon.com/images/M/MV5BNmU4M2E3Y2UtNzU1YS00OWYyLTk3OWEtNTY5NTY5OWYwZTBlXkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg',
     genres: ['Crime', 'Mystery'],
     totalSeasons: 2,
+    aliases: ['asur', 'asur 2', 'arshad warsi', 'असुर', 'असुर 2'],
   },
   {
     id: '216390',
@@ -378,6 +384,7 @@ export const TRENDING_SERIES: MediaItem[] = [
     poster: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500&auto=format&fit=crop',
     genres: ['Action', 'Fantasy'],
     totalSeasons: 2,
+    aliases: ['taaza khabar', 'bhuvan bam', 'ताजा खबर', 'ताज़ा खबर'],
   },
 ];
 
@@ -446,6 +453,7 @@ export const BOLLYWOOD_SPECIALS: MediaItem[] = [
     poster: 'https://m.media-amazon.com/images/M/MV5BZmM4YjVjOTMtMWE5ZS00NzZkLTk1NDgtYTQyNGM0Yjg2MjQ0XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg',
     genres: ['Biography', 'Drama'],
     duration: '2h 27m',
+    aliases: ['12th fail', 'twelfth fail', 'ips manoj', '12वीं फेल', 'बारहवीं फेल', '12 फेल'],
   },
   {
     id: '1124403',
@@ -458,6 +466,7 @@ export const BOLLYWOOD_SPECIALS: MediaItem[] = [
     poster: 'https://m.media-amazon.com/images/M/MV5BMjA5ZjM2ZTMtYzk4Mi00Mjc2LWI4NTMtNzQ4YjY5YmIyYzg0XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg',
     genres: ['Drama', 'Courtroom'],
     duration: '2h 12m',
+    aliases: ['bandaa', 'sirf ek bandaa', 'sirf ek bandaa kaafi hai', 'manoj bajpayee bandaa', 'सिर्फ एक बंदा काफी है', 'बंदा'],
   },
 ];
 

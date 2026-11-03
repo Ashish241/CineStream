@@ -100,18 +100,18 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
           </p>
 
           {/* Primary Action Controls */}
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:gap-3 pt-2">
             <button
               onClick={() => onPlay(current)}
-              className="tv-focus flex items-center gap-2 px-6 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm sm:text-base shadow-lg shadow-amber-500/25 transition-transform active:scale-95"
+              className="tv-focus flex items-center justify-center gap-2 px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-base shadow-lg shadow-amber-500/25 transition-transform active:scale-95 shrink-0"
             >
-              <Play className="w-5 h-5 fill-slate-950" />
+              <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-slate-950" />
               <span>Watch Now</span>
             </button>
 
             <button
               onClick={() => onToggleWatchlist(current)}
-              className="tv-focus flex items-center gap-2 px-5 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 font-semibold text-sm transition-all"
+              className="tv-focus flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 font-semibold text-xs sm:text-sm transition-all shrink-0"
             >
               {inWatchlist ? (
                 <>
@@ -128,14 +128,14 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
           </div>
         </div>
 
-        {/* Carousel controls & indicator dots */}
-        <div className="absolute right-4 sm:right-8 bottom-12 sm:bottom-16 flex items-center gap-3">
+        {/* Carousel controls & indicator dots (responsive placement) */}
+        <div className="hidden sm:flex absolute right-4 sm:right-8 bottom-12 sm:bottom-16 items-center gap-3">
           <button
             onClick={() => setCurrentIndex((prev) => (prev - 1 + items.length) % items.length)}
             className="tv-focus p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800"
             title="Previous featured"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <div className="flex items-center gap-1.5">
             {items.map((_, i) => (
@@ -154,7 +154,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             className="tv-focus p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800"
             title="Next featured"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>

@@ -90,24 +90,24 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Zone 3: Search, Voice & Actions */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* Live Search Bar */}
           <div className="relative">
             <div className="relative flex items-center">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search movies, web series..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
                 data-tv-nav="true"
-                className="tv-focus w-36 sm:w-56 md:w-64 bg-slate-900 border border-slate-800 text-white text-xs sm:text-sm rounded-xl pl-9 pr-8 py-2 focus:border-amber-500 focus:bg-slate-800/90 transition-all placeholder:text-slate-500"
+                className="tv-focus w-28 xs:w-36 sm:w-52 md:w-64 focus:w-40 xs:focus:w-48 sm:focus:w-52 md:focus:w-64 bg-slate-900 border border-slate-800 text-white text-xs sm:text-sm rounded-xl pl-8 sm:pl-9 pr-7 sm:pr-8 py-2 focus:border-amber-500 focus:bg-slate-800/90 transition-all placeholder:text-slate-500"
               />
               {searchQuery && (
                 <button
                   onClick={() => onSearchChange('')}
                   data-tv-nav="true"
-                  className="absolute right-2.5 text-slate-400 hover:text-white p-1"
+                  className="absolute right-2 text-slate-400 hover:text-white p-1"
                   title="Clear search"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -120,8 +120,8 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onOpenVoiceSearch}
             data-tv-nav="true"
-            className="tv-focus relative flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-amber-500/20 to-yellow-500/10 hover:from-amber-500/30 hover:to-yellow-500/20 text-amber-400 border border-amber-500/30 hover:border-amber-400 transition-all shadow-sm group"
-            title="Voice Search (Press V on TV remote / Speak movie title)"
+            className="tv-focus relative flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-amber-500/20 to-yellow-500/10 hover:from-amber-500/30 hover:to-yellow-500/20 text-amber-400 border border-amber-500/30 hover:border-amber-400 transition-all shadow-sm group shrink-0"
+            title="Voice Search (Press V on TV remote / Speak movie title in Hindi or English)"
           >
             <Mic className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
             <span className="hidden sm:inline">Voice</span>
@@ -131,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onOpenDirectModal}
             data-tv-nav="true"
-            className="tv-focus hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all"
+            className="tv-focus hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all shrink-0"
             title="Custom IMDb / TMDB ID Input"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
@@ -142,7 +142,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onOpenTvGuide}
             data-tv-nav="true"
-            className="tv-focus hidden md:flex items-center gap-1 px-2.5 py-2 text-xs font-medium rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all"
+            className="tv-focus hidden md:flex items-center gap-1 px-2.5 py-2 text-xs font-medium rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all shrink-0"
             title="TV Remote Keybindings Guide"
           >
             <HelpCircle className="w-4 h-4 text-slate-400" />
@@ -152,7 +152,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={onToggleTvMode}
             data-tv-nav="true"
-            className={`tv-focus flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl transition-all shadow-sm ${
+            className={`tv-focus flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-bold rounded-xl transition-all shadow-sm shrink-0 ${
               isTvMode
                 ? 'bg-amber-500 text-slate-950 font-extrabold shadow-amber-500/20'
                 : 'bg-slate-800/90 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-700'
@@ -160,7 +160,9 @@ export const Header: React.FC<HeaderProps> = ({
             title="Toggle Smart TV Remote Mode"
           >
             <Tv className="w-3.5 h-3.5" />
-            <span className="whitespace-nowrap">{isTvMode ? 'TV Mode ON' : 'TV Mode'}</span>
+            <span className="hidden xs:inline whitespace-nowrap">
+              {isTvMode ? 'TV ON' : 'TV Mode'}
+            </span>
           </button>
         </div>
       </div>

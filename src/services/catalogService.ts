@@ -10,6 +10,8 @@ import {
 } from '../data/curatedCatalog';
 import { IMDB_TO_TMDB_MAP } from '../data/servers';
 
+import { containsDevanagari, convertHindiToEnglish } from '../utils/hindiTransliteration';
+
 // Cinemeta Stremio open catalog endpoints (free, CORS-enabled, no API key needed)
 const CINEMETA_BASE = 'https://v3-cinemeta.strem.io';
 
@@ -51,11 +53,12 @@ interface CinemetaCatalogResponse {
   }>;
 }
 
-// Phonetic and typo-tolerant search normalizer
+// Phonetic and typo-tolerant search normalizer (preserves Devanagari letters)
 function normalizeSearch(text: string): string {
   return text
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
+    .replace(/[^\w\s\u0900-\u097F]/g, '')
+    .replace(/\s+/g, '')
     .replace(/j/g, 'z')
     .replace(/sh/g, 's')
     .replace(/ee/g, 'i')
@@ -65,7 +68,10 @@ function normalizeSearch(text: string): string {
 // Fallback search in curated catalog with alias matching and fuzzy phonetic support
 function searchLocalCatalog(query: string): MediaItem[] {
   const rawQ = query.toLowerCase().trim();
-  const normQ = normalizeSearch(query);
+  const isHindi = containsDevanagari(rawQ);
+  const transliterated = isHindi ? convertHindiToEnglish(rawQ).toLowerCase().trim() : '';
+  const normQ = normalizeSearch(rawQ);
+  const normTranslit = transliterated ? normalizeSearch(transliterated) : '';
 
   const all = [
     ...HERO_FEATURED_ITEMS,
@@ -83,23 +89,27 @@ function searchLocalCatalog(query: string): MediaItem[] {
     const normTitle = normalizeSearch(item.title);
     const itemOverview = (item.overview || '').toLowerCase();
 
-    // Check alias list (e.g. 'mirjapur', 'gramchitshalay', '40 bhoot', 'ali baba', 'panchayat 4', etc.)
+    // Check alias list (e.g. 'पंचायत', 'mirjapur', 'gramchitshalay', '40 bhoot', 'ali baba', 'panchayat 4', etc.)
     const matchesAlias = item.aliases?.some((alias) => {
       const aLower = alias.toLowerCase();
       const aNorm = normalizeSearch(alias);
       return (
         aLower.includes(rawQ) ||
         rawQ.includes(aLower) ||
-        aNorm.includes(normQ) ||
-        normQ.includes(aNorm)
+        (transliterated && (aLower.includes(transliterated) || transliterated.includes(aLower))) ||
+        (normQ.length >= 2 && (aNorm.includes(normQ) || normQ.includes(aNorm))) ||
+        (normTranslit.length >= 2 && (aNorm.includes(normTranslit) || normTranslit.includes(aNorm)))
       );
     });
 
     const isMatch =
       matchesAlias ||
       itemTitle.includes(rawQ) ||
-      normTitle.includes(normQ) ||
+      (transliterated && itemTitle.includes(transliterated)) ||
+      (normQ.length >= 2 && normTitle.includes(normQ)) ||
+      (normTranslit.length >= 2 && normTitle.includes(normTranslit)) ||
       itemOverview.includes(rawQ) ||
+      (transliterated && itemOverview.includes(transliterated)) ||
       item.id.toLowerCase() === rawQ ||
       (item.genres && item.genres.some((g) => g.toLowerCase().includes(rawQ)));
 
@@ -129,23 +139,32 @@ export async function searchCatalog(query: string): Promise<MediaItem[]> {
     }
   }
 
-  // Check local curated items first with phonetic / alias matching
-  const localMatches = searchLocalCatalog(cleanQuery);
+  // Detect Hindi and transliterate to English for global databases (TMDB/Cinemeta)
+  const isHindi = containsDevanagari(cleanQuery);
+  const englishQuery = isHindi ? convertHindiToEnglish(cleanQuery) : cleanQuery;
 
-  // If local query matched (e.g. Mirzapur, Panchayat, Gram Chikitsalay, Chumbak, Ali Baba), return promptly
+  // Check local curated items first with phonetic / alias matching (check both Hindi and English forms)
+  const localMatches = searchLocalCatalog(cleanQuery);
+  const englishLocalMatches = isHindi && englishQuery !== cleanQuery ? searchLocalCatalog(englishQuery) : [];
+
+  const initialMatchesMap = new Map<string, MediaItem>();
+  localMatches.forEach((m) => initialMatchesMap.set(m.id, m));
+  englishLocalMatches.forEach((m) => initialMatchesMap.set(m.id, m));
+
   try {
-    const encoded = encodeURIComponent(cleanQuery);
+    // Search TMDB using the English / Romanized query (which TMDB indexes best)
+    const encodedEnglish = encodeURIComponent(englishQuery);
     const TMDB_KEY = '8265bd1679663a7ea12ac168da84d2e8';
 
-    // 1. Concurrently query live TMDB API and Cinemeta for complete real-time global coverage
+    // Concurrently query live TMDB API and Cinemeta for complete real-time global coverage
     const [tmdbRes, movieRes, seriesRes] = await Promise.allSettled([
       fetch(
-        `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_KEY}&query=${encoded}&include_adult=false`
+        `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_KEY}&query=${encodedEnglish}&include_adult=false`
       ).then((r) => (r.ok ? r.json() : null)),
-      fetch(`${CINEMETA_BASE}/catalog/movie/top/search=${encoded}.json`, {
+      fetch(`${CINEMETA_BASE}/catalog/movie/top/search=${encodedEnglish}.json`, {
         headers: { Accept: 'application/json' },
       }).then((r) => (r.ok ? (r.json() as Promise<CinemetaCatalogResponse>) : null)),
-      fetch(`${CINEMETA_BASE}/catalog/series/top/search=${encoded}.json`, {
+      fetch(`${CINEMETA_BASE}/catalog/series/top/search=${encodedEnglish}.json`, {
         headers: { Accept: 'application/json' },
       }).then((r) => (r.ok ? (r.json() as Promise<CinemetaCatalogResponse>) : null)),
     ]);
@@ -217,8 +236,7 @@ export async function searchCatalog(query: string): Promise<MediaItem[]> {
     }
 
     // Merge without duplicates (favoring local high-res curated items first)
-    const combinedMap = new Map<string, MediaItem>();
-    localMatches.forEach((item) => combinedMap.set(item.id, item));
+    const combinedMap = new Map<string, MediaItem>(initialMatchesMap);
     remoteItems.forEach((item) => {
       if (!combinedMap.has(item.id)) {
         combinedMap.set(item.id, item);
@@ -228,7 +246,7 @@ export async function searchCatalog(query: string): Promise<MediaItem[]> {
     return Array.from(combinedMap.values());
   } catch (err) {
     console.warn('Network search failed, returning local catalog matches', err);
-    return localMatches;
+    return Array.from(initialMatchesMap.values());
   }
 }
 

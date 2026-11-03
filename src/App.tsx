@@ -42,6 +42,10 @@ import {
   Loader2,
   X,
   Trash2,
+  Home,
+  Film,
+  Sparkles,
+  Mic,
 } from 'lucide-react';
 
 export default function App() {
@@ -305,7 +309,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full pb-16">
+      <main className="flex-1 w-full pb-24 md:pb-16">
         {/* Active Player View */}
         {activeMedia ? (
           <PlayerView
@@ -703,8 +707,88 @@ export default function App() {
         )}
       </main>
 
+      {/* Mobile Bottom Navigation Bar (Thumb-friendly dock for Phone & Tablet screens) */}
+      <nav
+        aria-label="Mobile Navigation"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-xl px-2 py-1.5 flex items-center justify-around shadow-2xl"
+      >
+        <button
+          onClick={() => {
+            setCurrentTab('all');
+            setSearchQuery('');
+            setActiveMedia(null);
+            setSelectedOtt(null);
+          }}
+          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all ${
+            currentTab === 'all' && !searchQuery ? 'text-amber-400' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Home className="w-5 h-5" />
+          <span className="text-[10px] font-medium mt-0.5">Home</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setCurrentTab('movies');
+            setSearchQuery('');
+            setActiveMedia(null);
+            setSelectedOtt(null);
+          }}
+          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all ${
+            currentTab === 'movies' ? 'text-amber-400' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Film className="w-5 h-5" />
+          <span className="text-[10px] font-medium mt-0.5">Movies</span>
+        </button>
+
+        {/* Center Prominent Voice Search Action */}
+        <button
+          onClick={() => setShowVoiceSearch(true)}
+          className="relative -top-3 flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 shadow-lg shadow-amber-500/30 active:scale-95 transition-transform"
+          title="Voice Search (Hindi or English)"
+        >
+          <Mic className="w-6 h-6 stroke-[2.2]" />
+        </button>
+
+        <button
+          onClick={() => {
+            setCurrentTab('series');
+            setSearchQuery('');
+            setActiveMedia(null);
+            setSelectedOtt(null);
+          }}
+          className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all ${
+            currentTab === 'series' ? 'text-amber-400' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Tv className="w-5 h-5" />
+          <span className="text-[10px] font-medium mt-0.5">Series</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setCurrentTab('watchlist');
+            setSearchQuery('');
+            setActiveMedia(null);
+            setSelectedOtt(null);
+          }}
+          className={`relative flex flex-col items-center justify-center p-1.5 rounded-xl transition-all ${
+            currentTab === 'watchlist' ? 'text-amber-400' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Bookmark className="w-5 h-5" />
+          <span className="text-[10px] font-medium mt-0.5">My List</span>
+          {watchlist.length > 0 && (
+            <span className="absolute top-1 right-2 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center">
+              {watchlist.length}
+            </span>
+          )}
+        </button>
+      </nav>
+
       {/* Floating Smart TV Remote Guide Button */}
-      <aside aria-label="Smart TV shortcuts" className="fixed bottom-4 right-4 z-30 flex items-center gap-2">
+      <aside aria-label="Smart TV shortcuts" className="fixed bottom-20 md:bottom-4 right-4 z-30 flex items-center gap-2">
         <button
           onClick={() => setShowTvGuide(true)}
           className="tv-focus flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-400 border border-slate-700 shadow-xl backdrop-blur-md text-xs font-semibold"

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Mic, MicOff, Search, X, Volume2, Globe, Sparkles, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, Search, X, Volume2, Globe, Sparkles, AlertCircle, ArrowRight } from 'lucide-react';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
+import { containsDevanagari, convertHindiToEnglish } from '../utils/hindiTransliteration';
 
 interface VoiceSearchModalProps {
   isOpen: boolean;
@@ -16,8 +17,10 @@ const SAMPLE_QUERIES = [
   'Chumbak',
   'Pushpa 2 The Rule',
   'Gram Chikitsalay',
-  'KGF Chapter 2',
-  'Stranger Things',
+  'Stree 2',
+  'Gullak',
+  '12th Fail',
+  'Jawan',
 ];
 
 export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
@@ -28,6 +31,7 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
 }) => {
   const [selectedLang, setSelectedLang] = useState<'hi-IN' | 'en-IN' | 'en-US'>('hi-IN');
   const [manualInput, setManualInput] = useState('');
+  const [resolvedQuery, setResolvedQuery] = useState<string | null>(null);
 
   const {
     isSupported,
@@ -42,10 +46,14 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
     defaultLang: selectedLang,
     onSearchResult: (finalText) => {
       if (finalText.trim()) {
+        const queryToSubmit = containsDevanagari(finalText)
+          ? convertHindiToEnglish(finalText)
+          : finalText.trim();
+        setResolvedQuery(queryToSubmit);
         setTimeout(() => {
-          onSearchSubmit(finalText.trim());
+          onSearchSubmit(queryToSubmit);
           onClose();
-        }, 600);
+        }, 750);
       }
     },
   });
@@ -88,7 +96,10 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
   const handleManualSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (manualInput.trim()) {
-      onSearchSubmit(manualInput.trim());
+      const q = containsDevanagari(manualInput)
+        ? convertHindiToEnglish(manualInput)
+        : manualInput.trim();
+      onSearchSubmit(q);
       onClose();
     }
   };
@@ -231,20 +242,35 @@ export const VoiceSearchModal: React.FC<VoiceSearchModalProps> = ({
         )}
 
         {/* Live Transcript Box */}
-        <div className="w-full min-h-[64px] bg-slate-950/70 border border-slate-800/90 rounded-xl p-4 my-3 flex flex-col items-center justify-center">
+        <div className="w-full min-h-[72px] bg-slate-950/70 border border-slate-800/90 rounded-xl p-4 my-3 flex flex-col items-center justify-center">
           {currentDisplay ? (
-            <div className="space-y-1">
-              <span className="text-lg sm:text-2xl font-bold text-amber-300">
-                "{currentDisplay}"
-              </span>
+            <div className="space-y-1.5 w-full">
+              {containsDevanagari(currentDisplay) ? (
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3">
+                  <span className="text-base sm:text-xl font-medium text-slate-300">
+                    "{currentDisplay}"
+                  </span>
+                  <div className="flex items-center gap-1 text-xs text-amber-400 font-semibold uppercase tracking-wider bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                    <span>Converting to English</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-lg sm:text-2xl font-bold text-amber-300">
+                    "{resolvedQuery || convertHindiToEnglish(currentDisplay)}"
+                  </span>
+                </div>
+              ) : (
+                <span className="text-lg sm:text-2xl font-bold text-amber-300">
+                  "{currentDisplay}"
+                </span>
+              )}
               <p className="text-[11px] text-emerald-400 font-medium">
-                Searching automatically...
+                Searching automatically in 1080p HD catalog...
               </p>
             </div>
           ) : isListening ? (
             <div className="flex items-center gap-2 text-slate-400 text-sm">
               <Volume2 className="w-4 h-4 text-amber-400 animate-pulse" />
-              <span>Listening... Speak movie or series title</span>
+              <span>Listening... Speak movie or series title in Hindi or English</span>
             </div>
           ) : (
             <div className="text-slate-500 text-xs sm:text-sm">
