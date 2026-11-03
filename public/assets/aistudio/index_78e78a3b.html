@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My TV Streamer</title>
+  <style>
+    body { background: #0f172a; color: #fff; font-family: sans-serif; margin: 0; padding: 15px; text-align: center; }
+    .controls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px; }
+    input, select, button { padding: 10px 14px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #fff; font-size: 15px; }
+    button { background: #3b82f6; border: none; cursor: pointer; font-weight: bold; }
+    iframe { width: 100%; height: 82vh; border: none; border-radius: 8px; background: #000; }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <select id="type" onchange="toggleTV()">
+      <option value="movie">Movie</option>
+      <option value="tv">TV Series</option>
+    </select>
+    <input id="imdb" type="text" placeholder="IMDb ID (e.g. tt1375666)" value="tt1375666" />
+    <input id="season" type="number" placeholder="Season" value="1" style="width:70px; display:none;" />
+    <input id="episode" type="number" placeholder="Ep" value="1" style="width:70px; display:none;" />
+    <select id="server">
+        <option value="https://vidsrc.su">Server 1 (VidSrc SU)</option>
+        <option value="https://embed.su">Server 2 (Embed.su)</option>
+        <option value="https://multiembed.mov/directstream.php">Server 3 (MultiEmbed)</option>
+    </select>
+    <button onclick="loadStream()">Play</button>
+  </div>
+  <iframe id="player" allowfullscreen></iframe>
+
+  <script>
+    function toggleTV() {
+      const isTV = document.getElementById('type').value === 'tv';
+      document.getElementById('season').style.display = isTV ? 'inline-block' : 'none';
+      document.getElementById('episode').style.display = isTV ? 'inline-block' : 'none';
+    }
+    function loadStream() {
+        const type = document.getElementById('type').value;
+        const id = document.getElementById('imdb').value.trim();
+        const s = document.getElementById('season').value;
+        const e = document.getElementById('episode').value;
+        const srv = document.getElementById('server').value;
+        let url = '';
+        
+        if (srv.includes('multiembed')) {
+            url = type === 'movie' ? `${srv}?video_id=${id}` : `${srv}?video_id=${id}&s=${s}&e=${e}`;
+        } else if (srv.includes('embed.su')) {
+            url = type === 'movie' ? `${srv}/embed/movie/${id}` : `${srv}/embed/tv/${id}/${s}/${e}`;
+        } else {
+            // vidsrc.su format
+            url = type === 'movie' ? `${srv}/embed/movie/${id}` : `${srv}/embed/tv/${id}/${s}/${e}`;
+        }
+        document.getElementById('player').src = url;
+        }
+    loadStream();
+  </script>
+</body>
+</html>

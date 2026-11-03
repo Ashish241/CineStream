@@ -1,0 +1,6 @@
+{
+  "name": "CineStream TV - Smart TV Streaming Portal",
+  "description": "High-definition TV-browser friendly movie & series streaming platform with instant title search, 10+ reliable 1080p fallback servers, episode picker, and remote control navigation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
