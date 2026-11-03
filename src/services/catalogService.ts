@@ -462,7 +462,64 @@ export async function fetchMediaDetails(
 
     return { media, episodes: episodesMap };
   } catch (err) {
-    console.warn('Cinemeta fetch error, using synthetic fallback:', err);
+    // Try fetching live TMDB details if TMDB ID is available
+    const numericTmdbId = /^\d+$/.test(imdbId) ? imdbId : IMDB_TO_TMDB_MAP[imdbId];
+    if (numericTmdbId) {
+      try {
+        const TMDB_KEY = '8265bd1679663a7ea12ac168da84d2e8';
+        const tmdbEndpoint = normType === 'movie' ? 'movie' : 'tv';
+        const tmdbRes = await fetch(
+          `https://api.themoviedb.org/3/${tmdbEndpoint}/${numericTmdbId}?api_key=${TMDB_KEY}&language=en-US`
+        );
+        if (tmdbRes.ok) {
+          const tData = await tmdbRes.json();
+          const isTv = normType !== 'movie';
+          const releaseDate = isTv ? tData.first_air_date : tData.release_date;
+          const year = releaseDate ? String(releaseDate).slice(0, 4) : '';
+          const title = isTv ? tData.name : tData.title;
+          const seasonsCount = isTv ? (tData.number_of_seasons || 1) : undefined;
+
+          const media: MediaItem = {
+            id: String(tData.id),
+            tmdbId: String(tData.id),
+            imdbId: tData.imdb_id || (imdbId.startsWith('tt') ? imdbId : undefined),
+            title: title || `Title (${imdbId})`,
+            type: isTv ? 'tv' : 'movie',
+            poster: tData.poster_path
+              ? `https://image.tmdb.org/t/p/w500${tData.poster_path}`
+              : '',
+            backdrop: tData.backdrop_path
+              ? `https://image.tmdb.org/t/p/w1280${tData.backdrop_path}`
+              : undefined,
+            year: year || (tData.status === 'Ended' && releaseDate ? `${year}` : year),
+            rating: tData.vote_average ? String(tData.vote_average.toFixed(1)) : '8.0',
+            overview: tData.overview || '',
+            genres: tData.genres?.map((g: { name: string }) => g.name) || [],
+            totalSeasons: seasonsCount,
+          };
+
+          const episodesMap: Record<number, Episode[]> = {};
+          if (isTv && seasonsCount) {
+            for (let s = 1; s <= seasonsCount; s++) {
+              episodesMap[s] = [];
+              const epCount = tData.seasons?.find((sn: { season_number: number }) => sn.season_number === s)?.episode_count || 8;
+              for (let e = 1; e <= epCount; e++) {
+                episodesMap[s].push({
+                  season: s,
+                  episode: e,
+                  title: `Episode ${e}`,
+                });
+              }
+            }
+          }
+
+          return { media, episodes: episodesMap };
+        }
+      } catch (tmdbErr) {
+        console.warn('TMDB direct details fetch error:', tmdbErr);
+      }
+    }
+
     // Find in local catalog if available
     const local = [
       ...HERO_FEATURED_ITEMS,
@@ -472,7 +529,7 @@ export async function fetchMediaDetails(
       ...TRENDING_MOVIES,
       ...BOLLYWOOD_SPECIALS,
       ...ANIME_COLLECTION,
-    ].find((m) => m.id === imdbId || m.imdbId === imdbId);
+    ].find((m) => m.id === imdbId || m.imdbId === imdbId || m.tmdbId === imdbId);
 
     const media: MediaItem = local || {
       id: imdbId,

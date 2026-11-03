@@ -40,6 +40,8 @@ import {
   Play,
   RotateCcw,
   Loader2,
+  X,
+  Trash2,
 } from 'lucide-react';
 
 export default function App() {
@@ -123,6 +125,23 @@ export default function App() {
         localStorage.setItem('cinestream_history', JSON.stringify(next));
       } catch (e) {
         console.error(e);
+      }
+      return next;
+    });
+  };
+
+  // Remove individual item from watch history
+  const handleRemoveWatchHistoryItem = (mediaId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setWatchHistory((prev) => {
+      const next = prev.filter((h) => h.media.id !== mediaId);
+      try {
+        localStorage.setItem('cinestream_history', JSON.stringify(next));
+      } catch (err) {
+        console.error(err);
       }
       return next;
     });
@@ -414,7 +433,7 @@ export default function App() {
                             tabIndex={0}
                             role="button"
                             onClick={() => handlePlayMedia(hist.media, hist.season, hist.episode)}
-                            className="tv-focus flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 cursor-pointer group transition-all"
+                            className="tv-focus relative flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 cursor-pointer group transition-all"
                           >
                             <div className="relative w-16 h-20 rounded-lg overflow-hidden bg-slate-950 shrink-0">
                               {hist.media.poster ? (
@@ -434,7 +453,7 @@ export default function App() {
                               </div>
                             </div>
 
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 pr-6">
                               <h3 className="text-xs sm:text-sm font-bold text-white line-clamp-1 group-hover:text-amber-400 transition-colors">
                                 {hist.media.title}
                               </h3>
@@ -446,6 +465,18 @@ export default function App() {
                                 <span>Click to Resume</span>
                               </div>
                             </div>
+
+                            {/* Remove from Continue Watching Button */}
+                            <button
+                              type="button"
+                              tabIndex={0}
+                              onClick={(e) => handleRemoveWatchHistoryItem(hist.media.id, e)}
+                              className="absolute top-2.5 right-2.5 p-1.5 rounded-lg bg-slate-800/80 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700/60 hover:border-red-500/40 transition-all opacity-80 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
+                              title={`Remove ${hist.media.title} from history`}
+                              aria-label={`Remove ${hist.media.title} from history`}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         );
                       })}
