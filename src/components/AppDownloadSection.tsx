@@ -90,7 +90,7 @@ export const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({
   return (
     <section
       aria-label="Download TV and Mobile App"
-      className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${compact ? 'py-6' : 'py-8'} space-y-6`}
+      className={`max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 2xl:px-14 ${compact ? 'py-6' : 'py-8'} space-y-6`}
     >
       {/* Hero Banner Header for App Downloads */}
       <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-900/95 to-amber-950/30 border border-amber-500/30 p-5 sm:p-8 shadow-2xl">

@@ -1,6 +1,8 @@
-import { MediaItem, StreamServer, VideoQuality } from '../types';
+import { MediaItem, StreamServer } from '../types';
 
-// Fast lookup for known IMDb to TMDB mappings (Movies, Web Series, Anime & Indian TV Serials)
+const TMDB_KEY = '8265bd1679663a7ea12ac168da84d2e8';
+
+// Fast lookup for known IMDb to TMDB mappings (Movies, Web Series, Anime & TV Shows)
 export const IMDB_TO_TMDB_MAP: Record<string, string> = {
   // Indian Web Series & Hits
   tt12004706: '101352', // Panchayat (Official TMDB ID)
@@ -40,7 +42,7 @@ export const IMDB_TO_TMDB_MAP: Record<string, string> = {
   tt10230406: '103411', // Paatal Lok
   tt11801534: '100557', // Special OPS
 
-  // Indian Television Serials & Daily Soaps
+  // Indian Television Shows & Serials
   tt1301993: '42009',   // Taarak Mehta Ka Ooltah Chashmah
   tt0401916: '14955',   // C.I.D.
   tt12679726: '106154', // Anupamaa
@@ -89,130 +91,60 @@ export const IMDB_TO_TMDB_MAP: Record<string, string> = {
   tt0877057: '13916',   // Death Note
 };
 
-/**
- * Verified Direct Full-Episode Playlist & Video Embeds for Indian TV Serials & Shows
- * Solves the issue where western TMDB embed servers (VidSrc/VidLink) return "Content not found"
- * for Indian television serials (Sony SAB, SET India, Star Plus, Colors, Zee TV, DD National).
- */
-export const INDIAN_TV_SERIAL_PLAYLISTS: Record<
-  string,
-  { playlistId?: string; episodes?: string[]; fallbackVideoId: string }
-> = {
-  // Ali Baba Aur 40 Bhoot / Dastaan-E-Kabul (Sony SAB Full Episodes)
-  '331932': {
-    playlistId: 'PL6Rtnh6YJK7Z3r8w7c7s7e0T4a1W5l_6K',
-    episodes: [
-      '8q6M8O_e7pM',
-      'K5y0W2c1V4A',
-      'X9w2L3m5P8Q',
-    ],
-    fallbackVideoId: '8q6M8O_e7pM',
-  },
-  '208744': {
-    playlistId: 'PL6Rtnh6YJK7Z3r8w7c7s7e0T4a1W5l_6K',
-    fallbackVideoId: '8q6M8O_e7pM',
-  },
-  // Taarak Mehta Ka Ooltah Chashmah (Sony SAB Official Full Episodes)
-  '42009': {
-    playlistId: 'PL6Rtnh6YJK7Y_1a8bX0r1D2vZ3E4F5G6H',
-    fallbackVideoId: 'mO4pQ2w9xL0',
-  },
-  // C.I.D. (SET India Full Episodes)
-  '14955': {
-    playlistId: 'PLzufeTFnhupx8a9B2C3D4E5F6G7H8I9J0',
-    fallbackVideoId: 'vK9xL3m8P1Q',
-  },
-  // Aladdin - Naam Toh Suna Hoga (Sony SAB)
-  '81929': {
-    playlistId: 'PL6Rtnh6YJK7Y4d5E6F7G8H9I0J1K2L3M4',
-    fallbackVideoId: 'pL8mN2v4Q9W',
-  },
-  // Baalveer / Baalveer Returns (Sony SAB)
-  '64257': {
-    playlistId: 'PL6Rtnh6YJK7X1A2B3C4D5E6F7G8H9I0J1',
-    fallbackVideoId: 'rT5yU8i9O0P',
-  },
-  // Wagle Ki Duniya (Sony SAB)
-  '118345': {
-    playlistId: 'PL6Rtnh6YJK7W9X8Y7Z6A5B4C3D2E1F0G9',
-    fallbackVideoId: 'sD4fG6h8J0K',
-  },
-  // Tenali Rama (Sony SAB)
-  '73230': {
-    playlistId: 'PL6Rtnh6YJK7V1B2N3M4A5S6D7F8G9H0J1',
-    fallbackVideoId: 'zX2cV4b6N8M',
-  },
-  // Bhabiji Ghar Par Hain! (&TV)
-  '65933': {
-    playlistId: 'PL4b5C6D7E8F9G0H1I2J3K4L5M6N7O8P9Q',
-    fallbackVideoId: 'qW3eR5t7Y9U',
-  },
-  // Crime Patrol (SET India)
-  '42839': {
-    playlistId: 'PLzufeTFnhupw1Q2W3E4R5T6Y7U8I9O0P1',
-    fallbackVideoId: 'aS2dF4g6H8J',
-  },
-  // Anupamaa (Star Plus)
-  '106154': {
-    playlistId: 'PL1A2B3C4D5E6F7G8H9I0J1K2L3M4N5O6P',
-    fallbackVideoId: 'lK9jH7g5F3D',
-  },
-  // Yeh Rishta Kya Kehlata Hai (Star Plus)
-  '31467': {
-    playlistId: 'PL9O8I7U6Y5T4R3E2W1Q0P9O8I7U6Y5T4R',
-    fallbackVideoId: 'mN8bV6c4X2Z',
-  },
-  // Mahabharat
-  '61075': {
-    playlistId: 'PL3E4R5T6Y7U8I9O0P1Q2W3E4R5T6Y7U8I',
-    fallbackVideoId: 'pO9iU7y5T3R',
-  },
-  '31914': {
-    playlistId: 'PL3E4R5T6Y7U8I9O0P1Q2W3E4R5T6Y7U8I',
-    fallbackVideoId: 'pO9iU7y5T3R',
-  },
-  // Ramayan
-  '31910': {
-    playlistId: 'PL7U8I9O0P1Q2W3E4R5T6Y7U8I9O0P1Q2W',
-    fallbackVideoId: 'wE4rT6y8U0I',
-  },
-  // Shaktimaan
-  '16278': {
-    playlistId: 'PL5T6Y7U8I9O0P1Q2W3E4R5T6Y7U8I9O0P',
-    fallbackVideoId: 'eR5tY7u9I1O',
-  },
-};
-
 // Dynamic runtime resolver for any IMDb ID -> TMDB ID
-export async function resolveTmdbIdAsync(imdbId: string): Promise<string> {
-  if (!imdbId) return '';
-  if (IMDB_TO_TMDB_MAP[imdbId]) {
+export async function resolveTmdbIdAsync(imdbId: string, title?: string, type?: string): Promise<string> {
+  if (!imdbId && !title) return '';
+  if (imdbId && IMDB_TO_TMDB_MAP[imdbId]) {
     return IMDB_TO_TMDB_MAP[imdbId];
   }
-  if (/^\d+$/.test(imdbId)) return imdbId;
+  if (imdbId && /^\d+$/.test(imdbId)) return imdbId;
 
+  const cacheKey = `cinestream_tmdb_${imdbId || title}`;
   try {
-    const cached = localStorage.getItem(`cinestream_tmdb_${imdbId}`);
+    const cached = localStorage.getItem(cacheKey);
     if (cached && /^\d+$/.test(cached)) {
-      IMDB_TO_TMDB_MAP[imdbId] = cached;
+      if (imdbId) IMDB_TO_TMDB_MAP[imdbId] = cached;
       return cached;
     }
   } catch {}
 
   try {
-    const res = await fetch(
-      `https://api.themoviedb.org/3/find/${imdbId}?api_key=8265bd1679663a7ea12ac168da84d2e8&external_source=imdb_id`
-    );
-    if (res.ok) {
-      const data = await res.json();
-      const match = data.tv_results?.[0] || data.movie_results?.[0];
-      if (match?.id) {
-        const tmdbStr = String(match.id);
-        IMDB_TO_TMDB_MAP[imdbId] = tmdbStr;
-        try {
-          localStorage.setItem(`cinestream_tmdb_${imdbId}`, tmdbStr);
-        } catch {}
-        return tmdbStr;
+    if (imdbId && imdbId.startsWith('tt')) {
+      const res = await fetch(
+        `https://api.themoviedb.org/3/find/${imdbId}?api_key=${TMDB_KEY}&external_source=imdb_id`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const match = data.tv_results?.[0] || data.movie_results?.[0];
+        if (match?.id) {
+          const tmdbStr = String(match.id);
+          IMDB_TO_TMDB_MAP[imdbId] = tmdbStr;
+          try {
+            localStorage.setItem(cacheKey, tmdbStr);
+          } catch {}
+          return tmdbStr;
+        }
+      }
+    }
+
+    if (title) {
+      const endpoint = type === 'movie' ? 'movie' : 'tv';
+      const searchRes = await fetch(
+        `https://api.themoviedb.org/3/search/${endpoint}?api_key=${TMDB_KEY}&query=${encodeURIComponent(
+          title
+        )}`
+      );
+      if (searchRes.ok) {
+        const sData = await searchRes.json();
+        const first = sData.results?.[0];
+        if (first?.id) {
+          const tmdbStr = String(first.id);
+          if (imdbId) IMDB_TO_TMDB_MAP[imdbId] = tmdbStr;
+          try {
+            localStorage.setItem(cacheKey, tmdbStr);
+          } catch {}
+          return tmdbStr;
+        }
       }
     }
   } catch (err) {
@@ -243,36 +175,58 @@ export function getResolvedIds(params: {
   return { imdb: imdb || params.id, tmdb: tmdb || params.id, bestId };
 }
 
-// Ordered by verified uptime across Movies, Web Series, Anime, and Indian TV Serials
+/**
+ * Multi-CDN Auto-Aggregating Stream Servers
+ * Ordered by highest automatic resolution rate across Movies, Web Series, Anime & Shows
+ */
 export const STREAM_SERVERS: StreamServer[] = [
   {
     id: 'vidlink-pro',
-    name: 'Server 1: Primary HD (VidLink 1080p)',
-    badge: '1080p Ultra HD',
+    name: 'Auto-Stream Primary (1080p Ultra HD)',
+    badge: 'Auto 1080p CDN',
     quality: '1080p HD',
     isRecommended: true,
-    notes: 'High-speed TMDB stream engine with 1080p delivery for Movies, Web Series & Anime.',
+    notes: 'Primary multi-CDN auto-selecting engine with 1080p playback.',
     supportsTmdb: true,
     supportsImdb: true,
     buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
       const { bestId } = getResolvedIds({ id, imdbId, tmdbId });
-      // Special handling: Chumbak (485087) is a full-length feature film on TMDB
       if (bestId === '485087' || id === '313172') {
-        return `https://vidlink.pro/movie/485087`;
+        return `https://vidlink.pro/movie/485087?autoplay=true&primaryColor=f59e0b`;
       }
       if (type === 'movie') {
-        return `https://vidlink.pro/movie/${bestId}`;
+        return `https://vidlink.pro/movie/${bestId}?autoplay=true&primaryColor=f59e0b`;
       }
-      return `https://vidlink.pro/tv/${bestId}/${season}/${episode}`;
+      return `https://vidlink.pro/tv/${bestId}/${season}/${episode}?autoplay=true&primaryColor=f59e0b`;
+    },
+  },
+  {
+    id: 'autoembed-in',
+    name: 'Auto-Stream Backup 1 (India & Global Multi-CDN)',
+    badge: 'Hindi & Multi-Audio',
+    quality: '1080p HD',
+    isRecommended: true,
+    notes: 'Automatic multi-server aggregator for Indian & International OTT content.',
+    supportsTmdb: true,
+    supportsImdb: true,
+    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+      const { bestId } = getResolvedIds({ id, imdbId, tmdbId });
+      if (bestId === '485087' || id === '313172') {
+        return `https://player.autoembed.cc/embed/movie/485087`;
+      }
+      if (type === 'movie') {
+        return `https://player.autoembed.cc/embed/movie/${bestId}`;
+      }
+      return `https://player.autoembed.cc/embed/tv/${bestId}/${season}/${episode}`;
     },
   },
   {
     id: 'multiembed-hub',
-    name: 'Server 2: MultiEmbed (Hindi & Serials Hub)',
-    badge: 'Hindi Multi-Audio',
-    quality: 'Multi-Audio / Hindi',
+    name: 'Auto-Stream Backup 2 (MultiEmbed Hindi Hub)',
+    badge: 'Multi-Audio',
+    quality: '1080p HD',
     isRecommended: true,
-    notes: 'Best for Indian Web Series, Bollywood, South Hindi Dubbed & TV Serials.',
+    notes: 'High-availability mirror for Bollywood, Web Series & South Dubbed hits.',
     supportsTmdb: true,
     supportsImdb: true,
     buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
@@ -290,32 +244,12 @@ export const STREAM_SERVERS: StreamServer[] = [
     },
   },
   {
-    id: 'autoembed-in',
-    name: 'Server 3: AutoEmbed India (1080p Multi-Server)',
-    badge: 'Indian & Global CDN',
-    quality: '1080p HD',
-    isRecommended: true,
-    notes: 'Dedicated Indian & International auto-resolving mirror with Hindi audio tracks.',
-    supportsTmdb: true,
-    supportsImdb: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
-      const { bestId } = getResolvedIds({ id, imdbId, tmdbId });
-      if (bestId === '485087' || id === '313172') {
-        return `https://player.autoembed.cc/embed/movie/485087`;
-      }
-      if (type === 'movie') {
-        return `https://player.autoembed.cc/embed/movie/${bestId}`;
-      }
-      return `https://player.autoembed.cc/embed/tv/${bestId}/${season}/${episode}`;
-    },
-  },
-  {
     id: 'vidsrc-vip',
-    name: 'Server 4: VidSrc VIP (Fast Direct Mirror)',
+    name: 'Auto-Stream Backup 3 (VidSrc VIP Direct)',
     badge: 'Direct 1080p',
     quality: '1080p HD',
     isRecommended: true,
-    notes: 'Zero-buffer direct mirror for OTT Originals, Movies, and Anime.',
+    notes: 'Fast direct mirror for OTT Originals, Movies, and Anime.',
     supportsTmdb: true,
     supportsImdb: true,
     buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
@@ -331,8 +265,8 @@ export const STREAM_SERVERS: StreamServer[] = [
   },
   {
     id: 'embedsu',
-    name: 'Server 5: Embed.su (Adaptive High-Speed)',
-    badge: 'Adaptive Buffer',
+    name: 'Auto-Stream Backup 4 (Embed.su Cloud)',
+    badge: 'Adaptive Cloud',
     quality: '1080p HD',
     notes: 'Fast auto-routing player with adaptive CDN buffer.',
     supportsTmdb: true,
@@ -350,10 +284,10 @@ export const STREAM_SERVERS: StreamServer[] = [
   },
   {
     id: 'twoembed',
-    name: 'Server 6: 2Embed Direct (All Seasons & Serials)',
-    badge: 'Direct Stream',
+    name: 'Auto-Stream Backup 5 (2Embed Global)',
+    badge: 'Global Mirror',
     quality: '1080p HD',
-    notes: 'Reliable direct player with wide Indian TV serial and web series coverage.',
+    notes: 'Global fallback player for classic and regional content.',
     supportsTmdb: true,
     supportsImdb: true,
     buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
@@ -367,70 +301,19 @@ export const STREAM_SERVERS: StreamServer[] = [
       return `https://www.2embed.cc/embedtv/${bestId}&s=${season}&e=${episode}`;
     },
   },
-  {
-    id: 'vidsrc-su',
-    name: 'Server 7: VidSrc SU (Global Cloud)',
-    badge: '1080p Full HD',
-    quality: '1080p HD',
-    notes: 'Direct TMDB cloud scraper engine.',
-    supportsTmdb: true,
-    supportsImdb: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
-      const { bestId } = getResolvedIds({ id, imdbId, tmdbId });
-      if (bestId === '485087' || id === '313172') {
-        return `https://vidsrc.su/embed/movie/485087`;
-      }
-      if (type === 'movie') {
-        return `https://vidsrc.su/embed/movie/${bestId}`;
-      }
-      return `https://vidsrc.su/embed/tv/${bestId}/${season}/${episode}`;
-    },
-  },
-  {
-    id: 'smashystream',
-    name: 'Server 8: SmashyStream India (Hindi & TV Shows)',
-    badge: 'Hindi Dubbed & TV',
-    quality: 'Multi-Audio / Hindi',
-    notes: 'Alternative Indian server for TV serials, daily soaps, and regional movies.',
-    supportsTmdb: true,
-    supportsImdb: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
-      const { bestId } = getResolvedIds({ id, imdbId, tmdbId });
-      if (bestId === '485087' || id === '313172') {
-        return `https://player.smashy.stream/movie/485087`;
-      }
-      if (type === 'movie') {
-        return `https://player.smashy.stream/movie/${bestId}`;
-      }
-      return `https://player.smashy.stream/tv/${bestId}?s=${season}&e=${episode}`;
-    },
-  },
 ];
 
 export const DEFAULT_SERVER = STREAM_SERVERS[0];
 
-/**
- * Automatically selects the best working server for a given media item.
- * For Indian TV Serials (like Ali Baba, Taarak Mehta, CID, Anupamaa, etc.),
- * prioritizes MultiEmbed Hindi & Serials Hub (Server 2) or AutoEmbed India (Server 3)
- * which have much higher Indian television serial availability than western-only scrapers.
- */
 export function getPreferredServerIndexForMedia(media: MediaItem): number {
-  const { bestId } = getResolvedIds({
-    id: media.id,
-    imdbId: media.imdbId,
-    tmdbId: media.tmdbId,
-  });
-
-  if (
-    media.isSerial ||
-    media.category === 'serials' ||
-    Boolean(INDIAN_TV_SERIAL_PLAYLISTS[bestId]) ||
-    Boolean(INDIAN_TV_SERIAL_PLAYLISTS[media.id])
-  ) {
-    // Start on MultiEmbed Hindi & Serials Hub (index 1) for Indian TV serials
-    return 1;
-  }
-
+  try {
+    const saved = localStorage.getItem(`cinestream_srv_${media.id}`);
+    if (saved !== null) {
+      const idx = Number(saved);
+      if (!Number.isNaN(idx) && idx >= 0 && idx < STREAM_SERVERS.length) {
+        return idx;
+      }
+    }
+  } catch {}
   return 0;
 }

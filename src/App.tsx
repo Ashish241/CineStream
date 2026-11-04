@@ -53,8 +53,6 @@ import {
   Mic,
   Download,
   Plus,
-  Sparkles,
-  Radio,
 } from 'lucide-react';
 
 export default function App() {
@@ -282,14 +280,18 @@ export default function App() {
     return () => clearTimeout(timeout);
   }, [searchQuery]);
 
-  // Launch stream handler
+  // Launch stream handler with automatic TMDB/IMDb resolution
   const handlePlayMedia = async (media: MediaItem, season = 1, episode = 1) => {
     const enrichedMedia: MediaItem = { ...media };
     if (!enrichedMedia.tmdbId && IMDB_TO_TMDB_MAP[enrichedMedia.id]) {
       enrichedMedia.tmdbId = IMDB_TO_TMDB_MAP[enrichedMedia.id];
     }
     if (!enrichedMedia.tmdbId) {
-      const resolved = await resolveTmdbIdAsync(enrichedMedia.imdbId || enrichedMedia.id);
+      const resolved = await resolveTmdbIdAsync(
+        enrichedMedia.imdbId || enrichedMedia.id,
+        enrichedMedia.title,
+        enrichedMedia.type
+      );
       if (resolved && /^\d+$/.test(resolved)) {
         enrichedMedia.tmdbId = resolved;
       }
@@ -505,7 +507,7 @@ export default function App() {
           <>
             {/* If user is actively searching */}
             {searchQuery.trim() ? (
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+              <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 2xl:px-14 py-6 sm:py-8 space-y-6">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="text-lg sm:text-2xl font-bold text-white font-display flex items-center gap-2">
                     {isSearching ? (
@@ -538,7 +540,7 @@ export default function App() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 lg:gap-5">
                     {searchResults.map((item) => (
                       <MediaCard
                         key={item.id}
@@ -575,7 +577,7 @@ export default function App() {
 
                 {/* Continue Watching Row (from watch history) */}
                 {watchHistory.length > 0 && currentTab === 'all' && (
-                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-2">
+                  <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 2xl:px-14 pt-4 sm:pt-6 pb-2">
                     <div className="flex items-center justify-between mb-3">
                       <h2 className="text-base sm:text-xl font-bold text-white font-display flex items-center gap-2">
                         <Clock className="w-4 h-4 text-amber-400" />
@@ -592,8 +594,8 @@ export default function App() {
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                      {watchHistory.slice(0, 4).map((hist) => {
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
+                      {watchHistory.slice(0, 5).map((hist) => {
                         const isTV =
                           hist.media.type === 'tv' ||
                           hist.media.type === 'series' ||
@@ -634,7 +636,7 @@ export default function App() {
                               </p>
                               <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium mt-1">
                                 <RotateCcw className="w-2.5 h-2.5" />
-                                <span>Tap to Resume</span>
+                                <span>Resume</span>
                               </div>
                             </div>
 
@@ -665,7 +667,7 @@ export default function App() {
 
                 {/* Tab: Watchlist */}
                 {currentTab === 'watchlist' && (
-                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+                  <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 2xl:px-14 py-6 sm:py-8 space-y-6">
                     <h2 className="text-xl sm:text-2xl font-bold text-white font-display flex items-center gap-2">
                       <Bookmark className="w-5 h-5 text-amber-400" />
                       <span>My Watchlist ({watchlistedItems.length})</span>
@@ -673,10 +675,10 @@ export default function App() {
 
                     {watchlistedItems.length === 0 ? (
                       <div className="py-16 text-center text-slate-400 text-sm bg-slate-900/40 rounded-2xl border border-slate-800 p-8">
-                        Your watchlist is empty. Tap "+ Add to List" on any movie, web series, or TV serial to save it here.
+                        Your watchlist is empty. Tap "+ Add to List" on any movie, web series, or TV show to save it here.
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 lg:gap-5">
                         {watchlistedItems.map((item) => (
                           <MediaCard
                             key={item.id}
@@ -694,10 +696,10 @@ export default function App() {
 
                 {/* Tab: All / Home */}
                 {currentTab === 'all' && (
-                  <div className="max-w-7xl mx-auto space-y-1 sm:space-y-2">
+                  <div className="max-w-[1600px] mx-auto space-y-1 sm:space-y-2">
                     {/* Brand New 2026 & Latest OTT Releases Row */}
                     <CatalogSection
-                      title="Fresh 2026 & Latest OTT Releases"
+                      title="Latest OTT Releases & New Blockbusters"
                       subtitle="Pushpa 2, Kalki 2898 AD, Bhool Bhulaiyaa 3, Panchayat, Mirzapur, Ali Baba Aur 40 Bhoot & more"
                       items={mergeUnique(NEW_2026_RELEASES, liveFeeds.newIndianReleases)}
                       onSelect={(media) => handlePlayMedia(media)}
@@ -709,8 +711,8 @@ export default function App() {
                     {/* Live Auto-Synced Trending Today Row */}
                     {liveFeeds.trendingToday.length > 0 && (
                       <CatalogSection
-                        title="Live Trending Today Across All OTTs (Auto-Updated)"
-                        subtitle="Automatically synced daily with newly released global & Indian OTT titles"
+                        title="Trending Today Across All OTT Platforms"
+                        subtitle="Automatically updated daily with the newest movies and series"
                         items={liveFeeds.trendingToday}
                         onSelect={(media) => handlePlayMedia(media)}
                         watchlist={watchlist}
@@ -719,10 +721,10 @@ export default function App() {
                       />
                     )}
 
-                    {/* Popular Indian TV Serials & Daily Shows Row */}
+                    {/* Popular Indian TV Shows & Serials Row */}
                     <CatalogSection
-                      title="Popular Indian TV Serials & Daily Shows"
-                      subtitle="Taarak Mehta Ka Ooltah Chashmah, Ali Baba Aur 40 Bhoot, CID, Anupamaa, Baalveer & more (Direct Serial HD)"
+                      title="Popular Indian TV Shows & Serials"
+                      subtitle="Taarak Mehta Ka Ooltah Chashmah, Ali Baba Aur 40 Bhoot, CID, Anupamaa, Baalveer & more"
                       items={combinedSerials}
                       onSelect={(media) => handlePlayMedia(media)}
                       watchlist={watchlist}
@@ -732,7 +734,7 @@ export default function App() {
 
                     {/* Trending Web Series */}
                     <CatalogSection
-                      title="Trending Web Series (All OTT Platforms)"
+                      title="Trending Web Series (All OTT Originals)"
                       subtitle="Top binge-worthy shows from Netflix, Prime Video, JioHotstar, SonyLIV & ZEE5"
                       items={mergeUnique(TRENDING_SERIES, liveFeeds.liveSeries)}
                       onSelect={(media) => handlePlayMedia(media)}
@@ -744,7 +746,7 @@ export default function App() {
                     {/* Blockbuster Movies */}
                     <CatalogSection
                       title="Blockbuster Movies (New & Superhit)"
-                      subtitle="Highest grossing and critical favorites in 1080p Ultra HD"
+                      subtitle="Highest grossing and critical favorites in 1080p Full HD"
                       items={mergeUnique(TRENDING_MOVIES, liveFeeds.liveMovies)}
                       onSelect={(media) => handlePlayMedia(media)}
                       watchlist={watchlist}
@@ -800,25 +802,18 @@ export default function App() {
                   currentTab === 'serials' ||
                   currentTab === 'bollywood' ||
                   currentTab === 'anime') && (
-                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+                  <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 2xl:px-14 py-6 sm:py-8 space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
-                        <h2 className="text-xl sm:text-2xl font-bold text-white font-display flex items-center gap-2">
-                          {currentTab === 'serials' && (
-                            <Radio className="w-5 h-5 text-emerald-400" />
-                          )}
-                          <span>
-                            {currentTab === 'movies' && 'All New & Classic Movies'}
-                            {currentTab === 'series' && 'All OTT Web Series'}
-                            {currentTab === 'serials' && 'Indian TV Serials & Daily Shows'}
-                            {currentTab === 'bollywood' && 'Hindi & Bollywood Catalog'}
-                            {currentTab === 'anime' && 'Complete Anime Collection'}
-                          </span>
+                        <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-display">
+                          {currentTab === 'movies' && 'All New & Classic Movies'}
+                          {currentTab === 'series' && 'All OTT Web Series'}
+                          {currentTab === 'serials' && 'Indian TV Shows & Serials'}
+                          {currentTab === 'bollywood' && 'Hindi & Bollywood Catalog'}
+                          {currentTab === 'anime' && 'Complete Anime Collection'}
                         </h2>
-                        <p className="text-xs text-slate-400 mt-1">
-                          {currentTab === 'serials'
-                            ? 'Powered by Direct TV Serial HD Engine — plays TMKOC, CID, Ali Baba Aur 40 Bhoot, Anupamaa & all daily serials without errors.'
-                            : 'Auto-synced with live OTT releases. Browse popular, newest, or all-time classic titles.'}
+                        <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                          Select any title to start streaming immediately in 1080p Full HD.
                         </p>
                       </div>
 
@@ -845,8 +840,8 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Grid of Items */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                    {/* Grid of Items Optimized for Mobile (2), Tablet (3-4), Laptop (5-6), Smart TV (7) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 lg:gap-5">
                       {(currentTab === 'movies'
                         ? combinedMovies
                         : currentTab === 'series'
@@ -884,7 +879,7 @@ export default function App() {
                         ) : (
                           <>
                             <Plus className="w-4 h-4" />
-                            <span>Load More Live Titles (Page {discoverPage + 1})</span>
+                            <span>Load More Titles (Page {discoverPage + 1})</span>
                           </>
                         )}
                       </button>
@@ -897,7 +892,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Mobile Bottom Navigation Bar (Thumb-friendly dock for Phone & Tablet screens) */}
+      {/* Mobile Bottom Navigation Bar (Visible ONLY on phones < 768px) */}
       <nav
         aria-label="Mobile Navigation"
         className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-xl px-2 py-1.5 flex items-center justify-around shadow-2xl"
@@ -943,17 +938,17 @@ export default function App() {
 
         <button
           onClick={() => {
-            setCurrentTab('serials');
+            setCurrentTab('series');
             setSearchQuery('');
             setActiveMedia(null);
             setSelectedOtt(null);
           }}
           className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all ${
-            currentTab === 'serials' ? 'text-amber-400' : 'text-slate-400 hover:text-white'
+            currentTab === 'series' ? 'text-amber-400' : 'text-slate-400 hover:text-white'
           }`}
         >
           <Tv className="w-5 h-5" />
-          <span className="text-[10px] font-medium mt-0.5">Serials</span>
+          <span className="text-[10px] font-medium mt-0.5">Series</span>
         </button>
 
         <button
@@ -972,7 +967,7 @@ export default function App() {
         </button>
       </nav>
 
-      {/* Floating Smart TV Remote Guide & App Download Shortcut (Desktop/TV) */}
+      {/* Floating Smart TV Remote Guide & App Download Shortcut (Tablet, Laptop, Desktop & TV) */}
       <aside
         aria-label="Smart TV shortcuts"
         className="hidden md:flex fixed bottom-4 right-4 z-30 items-center gap-2"
@@ -988,7 +983,7 @@ export default function App() {
           title="Install TV App (Airtel Xstream Box) & Mobile App"
         >
           <Download className="w-4 h-4" />
-          <span>Download TV / Mobile App</span>
+          <span>Get TV / Mobile App</span>
         </button>
 
         <button

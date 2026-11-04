@@ -26,7 +26,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollRef.current) return;
-    const distance = scrollRef.current.clientWidth * 0.75;
+    const distance = scrollRef.current.clientWidth * 0.78;
     scrollRef.current.scrollBy({
       left: direction === 'left' ? -distance : distance,
       behavior: 'smooth',
@@ -36,18 +36,20 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
   if (!items || items.length === 0) return null;
 
   return (
-    <section className="py-6 sm:py-8 space-y-3.5">
+    <section className="py-4 sm:py-6 lg:py-7 space-y-3 sm:space-y-4">
       {/* Section Header */}
-      <div className="flex items-end justify-between px-4 sm:px-6 lg:px-8">
+      <div className="flex items-end justify-between px-4 sm:px-6 lg:px-10 2xl:px-14">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-display">
+          <h2 className="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight text-white font-display">
             {title}
           </h2>
-          {subtitle && <p className="text-xs sm:text-sm text-slate-400 mt-0.5">{subtitle}</p>}
+          {subtitle && (
+            <p className="text-xs sm:text-sm text-slate-400 mt-0.5 line-clamp-1">{subtitle}</p>
+          )}
         </div>
 
-        {/* Scroll Nav Buttons */}
-        <div className="hidden sm:flex items-center gap-1.5">
+        {/* Scroll Nav Buttons (Tablet, Laptop, Desktop & TV) */}
+        <div className="hidden sm:flex items-center gap-1.5 shrink-0">
           <button
             onClick={() => scroll('left')}
             className="tv-focus p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
@@ -65,16 +67,16 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({
         </div>
       </div>
 
-      {/* Horizontal Scroll Row */}
+      {/* Horizontal Scroll Row Optimized for Mobile, Tablet, Laptop & TV */}
       <div
         ref={scrollRef}
-        className="flex items-stretch gap-3.5 sm:gap-4 overflow-x-auto px-4 sm:px-6 lg:px-8 pb-3 pt-1 scroll-smooth no-scrollbar"
+        className="flex items-stretch gap-3 sm:gap-4 lg:gap-5 overflow-x-auto px-4 sm:px-6 lg:px-10 2xl:px-14 pb-3 pt-1 scroll-smooth no-scrollbar"
         style={{ scrollSnapType: 'x mandatory' }}
       >
         {items.map((item) => (
           <div
             key={item.id}
-            className="w-[140px] sm:w-[170px] md:w-[190px] lg:w-[210px] shrink-0"
+            className="w-[140px] sm:w-[168px] md:w-[188px] lg:w-[210px] xl:w-[225px] 2xl:w-[245px] shrink-0"
             style={{ scrollSnapAlign: 'start' }}
           >
             <MediaCard

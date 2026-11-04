@@ -73,12 +73,12 @@ export const OttHubView: React.FC<OttHubViewProps> = ({
   return (
     <div className={`min-h-screen w-full bg-gradient-to-b ${ott.bgGradient} text-white pb-24 select-none`}>
       {/* OTT Platform Authentic Top Navigation */}
-      <header className="sticky top-0 z-40 bg-black/85 backdrop-blur-md border-b border-white/10 px-4 sm:px-8 py-3 flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-40 bg-black/85 backdrop-blur-md border-b border-white/10 px-4 sm:px-6 lg:px-10 2xl:px-14 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 sm:gap-6">
           <button
             onClick={onExit}
             data-tv-nav="true"
-            className="tv-focus flex items-center gap-1.5 sm:gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm border border-white/15 shadow-lg transition-transform active:scale-95"
+            className="tv-focus flex items-center gap-1.5 sm:gap-2 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm border border-white/15 shadow-lg transition-transform active:scale-95"
             title="Exit to CineStream Hub (Esc / Back button)"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -93,7 +93,7 @@ export const OttHubView: React.FC<OttHubViewProps> = ({
               {ott.logoText}
             </span>
             <span className="hidden sm:inline text-xs font-semibold px-2 py-0.5 rounded bg-white/10 text-white/80 border border-white/10">
-              Live Auto-Sync Hub
+              Official Hub
             </span>
           </div>
         </div>
@@ -104,7 +104,7 @@ export const OttHubView: React.FC<OttHubViewProps> = ({
       </header>
 
       {/* Authentic Platform Hero Billboard */}
-      <div className="relative w-full h-[380px] sm:h-[480px] lg:h-[540px] overflow-hidden bg-black">
+      <div className="relative w-full h-[380px] sm:h-[460px] md:h-[500px] lg:h-[560px] 2xl:h-[620px] overflow-hidden bg-black">
         <img
           src={hero.backdrop || hero.poster}
           alt={hero.title}
@@ -115,7 +115,7 @@ export const OttHubView: React.FC<OttHubViewProps> = ({
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/65 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent max-w-3xl" />
 
-        <div className="relative max-w-7xl mx-auto h-full px-4 sm:px-8 flex flex-col justify-end pb-8 sm:pb-12 z-10 space-y-3 sm:space-y-4">
+        <div className="relative max-w-[1600px] mx-auto h-full px-4 sm:px-6 lg:px-10 2xl:px-14 flex flex-col justify-end pb-8 sm:pb-12 z-10 space-y-3 sm:space-y-4">
           <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider text-white/80">
             <span className={`px-2 py-0.5 rounded text-[11px] ${ott.badgeStyle}`}>
               {ott.name} Original
@@ -135,7 +135,7 @@ export const OttHubView: React.FC<OttHubViewProps> = ({
             )}
           </div>
 
-          <h1 className="text-2xl sm:text-5xl font-black text-white font-display max-w-2xl text-balance">
+          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white font-display max-w-2xl text-balance">
             {hero.title}
           </h1>
 
@@ -151,7 +151,7 @@ export const OttHubView: React.FC<OttHubViewProps> = ({
               style={{ backgroundColor: ott.accentColor, color: '#000' }}
             >
               <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
-              <span>Watch on {ott.name}</span>
+              <span>Watch Now</span>
             </button>
 
             <button
@@ -175,15 +175,15 @@ export const OttHubView: React.FC<OttHubViewProps> = ({
         </div>
       </div>
 
-      {/* Curated & Live Auto-Updating Content Categories for this OTT */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 space-y-8 mt-6">
+      {/* Content Categories for this OTT */}
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 2xl:px-14 space-y-8 mt-6">
         {ott.categories.map((cat, idx) => (
-          <div key={idx} className="space-y-3">
+          <div key={idx} className="space-y-3.5">
             <h2 className="text-lg sm:text-2xl font-bold tracking-tight text-white font-display">
               {cat.title}
             </h2>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 lg:gap-5">
               {cat.items.map((item) => (
                 <MediaCard
                   key={item.id}
@@ -200,15 +200,15 @@ export const OttHubView: React.FC<OttHubViewProps> = ({
 
         {/* Live Auto-Synced Web Series & Shows on this OTT Platform */}
         {liveSeries.length > 0 && (
-          <div className="space-y-3 pt-2">
+          <div className="space-y-3.5 pt-2">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-400" />
               <h2 className="text-lg sm:text-2xl font-bold tracking-tight text-white font-display">
-                All Live {ott.name} Web Series & TV Shows ({liveSeries.length}+)
+                More {ott.name} Web Series & Shows ({liveSeries.length}+)
               </h2>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 lg:gap-5">
               {liveSeries.map((item) => (
                 <MediaCard
                   key={`live-s-${item.id}`}
@@ -225,15 +225,15 @@ export const OttHubView: React.FC<OttHubViewProps> = ({
 
         {/* Live Auto-Synced Movies on this OTT Platform */}
         {liveMovies.length > 0 && (
-          <div className="space-y-3 pt-2">
+          <div className="space-y-3.5 pt-2">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-400" />
               <h2 className="text-lg sm:text-2xl font-bold tracking-tight text-white font-display">
-                All Live {ott.name} Movies & Blockbusters ({liveMovies.length}+)
+                More {ott.name} Movies & Blockbusters ({liveMovies.length}+)
               </h2>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4 lg:gap-5">
               {liveMovies.map((item) => (
                 <MediaCard
                   key={`live-m-${item.id}`}
@@ -259,12 +259,12 @@ export const OttHubView: React.FC<OttHubViewProps> = ({
             {isLoadingLive ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Loading More {ott.name} Releases...</span>
+                <span>Loading More {ott.name} Titles...</span>
               </>
             ) : (
               <>
                 <Plus className="w-4 h-4" />
-                <span>Load More {ott.name} Movies & Web Series (Page {page + 1})</span>
+                <span>Load More {ott.name} Movies & Series</span>
               </>
             )}
           </button>

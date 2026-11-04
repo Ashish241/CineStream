@@ -14,24 +14,24 @@ export const OttSelectorRow: React.FC<OttSelectorRowProps> = ({
   const platforms = Object.values(OTT_PLATFORMS);
 
   return (
-    <section className="py-6 sm:py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-3.5">
+    <section className="py-5 sm:py-7 px-4 sm:px-6 lg:px-10 2xl:px-14 max-w-[1600px] mx-auto space-y-3.5">
       <div className="flex items-end justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Select Your Streaming Hub</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-display mt-0.5">
-            OTT Platforms Hub (Original UI & Catalog)
+          <h2 className="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight text-white font-display mt-0.5">
+            OTT Platforms Hub (Original UI & Live Catalog)
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Click any OTT platform to switch to its authentic UI theme and exclusive shows.
+          <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+            Tap any OTT platform to browse all its new & classic movies, web series, and originals.
           </p>
         </div>
       </div>
 
-      {/* Grid of OTT Platforms */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      {/* Responsive Grid across Mobile (2 cols), Tablet (3 cols), Laptop & TV (6 cols) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-5">
         {platforms.map((ott) => {
           let badgeBg = 'bg-zinc-900 border-zinc-800';
           let textColor = 'text-white';
@@ -67,6 +67,7 @@ export const OttSelectorRow: React.FC<OttSelectorRowProps> = ({
             <button
               key={ott.id}
               onClick={() => onSelectOtt(ott)}
+              data-tv-nav="true"
               className={`tv-focus group relative flex flex-col items-center justify-center p-4 sm:p-5 rounded-2xl border text-center transition-all duration-200 select-none shadow-lg ${badgeBg} ${hoverBorder} ${
                 isTvMode ? 'hover:scale-105' : 'hover:-translate-y-0.5'
               }`}
@@ -77,11 +78,11 @@ export const OttSelectorRow: React.FC<OttSelectorRowProps> = ({
                 {ott.logoText}
               </div>
 
-              <div className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors">
+              <div className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
                 {ott.name}
               </div>
 
-              <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+              <div className="text-[10px] sm:text-[11px] text-slate-400 line-clamp-1 mt-0.5">
                 {ott.tagline}
               </div>
 
