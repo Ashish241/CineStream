@@ -84,7 +84,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
   onBack,
 }) => {
   const isSerialMedia = isLikelyTvSerial(media);
-  const isTV = media.type === 'tv' || media.type === 'series' || isSerialMedia;
+  const isTV = media.type === 'tv' || media.type === 'series';
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showEpisodeModal, setShowEpisodeModal] = useState(false);
@@ -212,7 +212,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     setServerIndex(nextIdx);
     setIframeKey((prev) => prev + 1);
     try {
-      localStorage.setItem(`cinestream_srv_${media.id}`, String(nextIdx));
+      localStorage.setItem(`cinestream_srv_v3_${media.id}`, String(nextIdx));
     } catch {}
     showToast(
       reason
@@ -238,7 +238,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     setServerIndex(chosenIdx);
     setIframeKey((prev) => prev + 1);
     try {
-      localStorage.setItem(`cinestream_srv_${media.id}`, String(chosenIdx));
+      localStorage.setItem(`cinestream_srv_v3_${media.id}`, String(chosenIdx));
     } catch {}
     showToast(`Switched to ${STREAM_SERVERS[chosenIdx].name}`);
   };

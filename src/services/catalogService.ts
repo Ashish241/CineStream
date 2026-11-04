@@ -107,6 +107,9 @@ const SERIAL_TITLE_PATTERNS = [
   'indian idol',
   'shark tank india',
   'kaun banega crorepati',
+  'gullak',
+  'aspirants',
+  'chumbak',
 ];
 
 export function isLikelyTvSerial(media: MediaItem): boolean {
@@ -565,17 +568,34 @@ export async function fetchDirectSerialStreams(
     .replace(/Season\s*\d+/gi, '')
     .trim();
 
-  // For Ali Baba Aur 40 Bhoot, search both popular names so episodes always resolve
+  const lowerTitle = searchTitle.toLowerCase();
   const isAliBaba =
-    searchTitle.toLowerCase().includes('ali baba') || searchTitle.toLowerCase().includes('40 bhoot');
+    lowerTitle.includes('ali baba') || lowerTitle.includes('40 bhoot');
+  const isChumbak = lowerTitle.includes('chumbak');
+  const isGullak = lowerTitle.includes('gullak');
+  const isAspirants = lowerTitle.includes('aspirants');
 
-  const queries = isMovie
-    ? [`${searchTitle} full movie hindi`, `${searchTitle} full movie`]
+  const queries = isChumbak
+    ? ['Chumbak 2018 Hindi Movie', 'Chumbak Marathi Movie Swanand Kirkire', 'Chumbak Full Movie']
+    : isMovie
+    ? [`${searchTitle} full movie hindi`, `${searchTitle} full movie`, searchTitle]
     : isAliBaba
     ? [
         `Ali Baba Dastaan E Kabul Episode ${episode}`,
         `Ali Baba Ek Andaaz Andekha Episode ${episode}`,
         `Ali Baba Episode ${episode} Full Episode`,
+      ]
+    : isGullak
+    ? [
+        `Gullak Season ${season} Episode ${episode}`,
+        `Gullak S0${season}E0${episode}`,
+        `Gullak Full Episode ${episode}`,
+      ]
+    : isAspirants
+    ? [
+        `TVF Aspirants Season ${season} Episode ${episode}`,
+        `TVF Aspirants Episode ${episode}`,
+        `Aspirants Season ${season} Episode ${episode}`,
       ]
     : [
         `${searchTitle} Episode ${episode} Full Episode`,
@@ -587,7 +607,7 @@ export async function fetchDirectSerialStreams(
     for (const q of queries) {
       const encoded = encodeURIComponent(q);
       const res = await fetch(
-        `https://api.dailymotion.com/videos?search=${encoded}&longer_than=5&limit=8&fields=id,title,duration,thumbnail_url`
+        `https://api.dailymotion.com/videos?search=${encoded}&longer_than=3&limit=8&fields=id,title,duration,thumbnail_url`
       );
       if (!res.ok) continue;
       const data = await res.json();
@@ -756,8 +776,8 @@ export async function fetchMediaDetails(
     (imdbId === '101352' ? CURATED_SERIES_EPISODES['tt11912196'] : null) ||
     (imdbId === '84105' ? CURATED_SERIES_EPISODES['tt6473300'] : null) ||
     (imdbId === '290138' ? CURATED_SERIES_EPISODES['tt34907994'] : null) ||
-    (imdbId === '208744' ? CURATED_SERIES_EPISODES['tt21896792'] : null) ||
-    (imdbId === '124151' ? CURATED_SERIES_EPISODES['tt14493392'] : null);
+    (imdbId === '208744' || imdbId === '331932' ? CURATED_SERIES_EPISODES['tt21896792'] : null) ||
+    (imdbId === '124151' || imdbId === '127332' ? CURATED_SERIES_EPISODES['tt14493392'] : null);
 
   const allLocalItems = [
     ...HERO_FEATURED_ITEMS,
