@@ -3,24 +3,36 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 export function isSmartTvUserAgent(): boolean {
   if (typeof window === 'undefined') return false;
   const ua = navigator.userAgent;
-  return /SmartTV|Tizen|Web0S|webOS|AppleTV|Android.*TV|HbbTV|CrKey|Viera|BRAVIA|Silk|AmazonWebAppPlatform/i.test(
+  const search = window.location.search;
+  if (search.includes('tv=1') || search.includes('mode=tv')) return true;
+  return /SmartTV|Tizen|Web0S|webOS|AppleTV|Android.*TV|GoogleTV|HbbTV|CrKey|Viera|BRAVIA|Silk|AmazonWebAppPlatform|Airtel|Xstream|AFTB|AFTM|AFTT|MiBox|SHIELD|TV Bro/i.test(
     ua
   );
 }
 
 export function useTvMode() {
   const [isTvMode, setIsTvMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem('cinestream_tv_mode');
-    if (saved !== null) {
-      return saved === 'true';
+    if (typeof window !== 'undefined' && window.location.search.includes('tv=1')) {
+      try {
+        localStorage.setItem('cinestream_tv_mode', 'true');
+      } catch {}
+      return true;
     }
+    try {
+      const saved = localStorage.getItem('cinestream_tv_mode');
+      if (saved !== null) {
+        return saved === 'true';
+      }
+    } catch {}
     return isSmartTvUserAgent();
   });
 
   const toggleTvMode = useCallback(() => {
     setIsTvMode((prev) => {
       const next = !prev;
-      localStorage.setItem('cinestream_tv_mode', String(next));
+      try {
+        localStorage.setItem('cinestream_tv_mode', String(next));
+      } catch {}
       return next;
     });
   }, []);
@@ -50,7 +62,7 @@ export function useTvHotkeys(handlers: TvKeyHandlers, enabled = true) {
         (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
 
       if (isInput) {
-        if (e.key === 'Escape') {
+        if (e.key === 'Escape' || e.key === 'GoBack' || e.key === 'BrowserBack') {
           target.blur();
         }
         return;
@@ -61,6 +73,7 @@ export function useTvHotkeys(handlers: TvKeyHandlers, enabled = true) {
         case 'Backspace':
         case 'GoBack':
         case 'BrowserBack':
+        case ' XF86Back':
           if (handlers.onBack) {
             e.preventDefault();
             handlers.onBack();
@@ -75,6 +88,8 @@ export function useTvHotkeys(handlers: TvKeyHandlers, enabled = true) {
           break;
         case 'n':
         case 'N':
+        case 'ChannelUp':
+        case 'MediaTrackNext':
           if (handlers.onNextEpisode) {
             e.preventDefault();
             handlers.onNextEpisode();
@@ -82,6 +97,8 @@ export function useTvHotkeys(handlers: TvKeyHandlers, enabled = true) {
           break;
         case 'p':
         case 'P':
+        case 'ChannelDown':
+        case 'MediaTrackPrevious':
           if (handlers.onPrevEpisode) {
             e.preventDefault();
             handlers.onPrevEpisode();
@@ -89,6 +106,7 @@ export function useTvHotkeys(handlers: TvKeyHandlers, enabled = true) {
           break;
         case 's':
         case 'S':
+        case 'ColorF0Red':
           if (handlers.onNextServer) {
             e.preventDefault();
             handlers.onNextServer();
@@ -96,6 +114,7 @@ export function useTvHotkeys(handlers: TvKeyHandlers, enabled = true) {
           break;
         case 'q':
         case 'Q':
+        case 'ColorF1Green':
           if (handlers.onToggleQuality) {
             e.preventDefault();
             handlers.onToggleQuality();
@@ -103,6 +122,8 @@ export function useTvHotkeys(handlers: TvKeyHandlers, enabled = true) {
           break;
         case 'v':
         case 'V':
+        case 'AudioVolumeMute':
+        case 'ColorF2Yellow':
           if (handlers.onVoiceSearch) {
             e.preventDefault();
             handlers.onVoiceSearch();

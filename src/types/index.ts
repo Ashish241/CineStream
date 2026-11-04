@@ -19,6 +19,9 @@ export interface MediaItem {
   featured?: boolean;
   category?: string;
   aliases?: string[];
+  isSerial?: boolean;
+  defaultServerId?: string;
+  platform?: string;
 }
 
 export interface Episode {

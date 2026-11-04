@@ -17,9 +17,21 @@ import {
   Timer,
   Zap,
   AlertTriangle,
+  Tv,
+  Radio,
+  Loader2,
 } from 'lucide-react';
 import { Episode, MediaItem, StreamServer, VideoQuality } from '../types';
-import { DEFAULT_SERVER, STREAM_SERVERS } from '../data/servers';
+import {
+  DEFAULT_SERVER,
+  STREAM_SERVERS,
+  getPreferredServerIndexForMedia,
+} from '../data/servers';
+import {
+  DirectSerialStream,
+  fetchDirectSerialStreams,
+  isLikelyTvSerial,
+} from '../services/catalogService';
 import { EpisodePicker } from './EpisodePicker';
 
 interface QualityOption {
@@ -90,6 +102,9 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
   onBack,
   isTvMode = false,
 }) => {
+  const isSerialMedia = isLikelyTvSerial(media);
+  const isTV = media.type === 'tv' || media.type === 'series' || isSerialMedia;
+
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showEpisodeModal, setShowEpisodeModal] = useState(false);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
@@ -99,9 +114,18 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
   const [errorToast, setErrorToast] = useState<PlaybackErrorToast | null>(null);
   const errorToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Server state - stable and manual selection (no disruptive auto-switching timers)
-  const [serverIndex, setServerIndex] = useState<number>(0);
+  // Server state: starts on optimal server for media type
+  const [serverIndex, setServerIndex] = useState<number>(() =>
+    getPreferredServerIndexForMedia(media)
+  );
   const [showServerMenu, setShowServerMenu] = useState<boolean>(false);
+
+  // Direct TV Serial & Hindi Show Resolver Engine (Automatically active for Indian TV serials)
+  const [useDirectSerialEngine, setUseDirectSerialEngine] = useState<boolean>(isSerialMedia);
+  const [directStreams, setDirectStreams] = useState<DirectSerialStream[]>([]);
+  const [selectedDirectMirror, setSelectedDirectMirror] = useState<number>(0);
+  const [isLoadingDirectStreams, setIsLoadingDirectStreams] = useState<boolean>(false);
+
   const activeServer = STREAM_SERVERS[serverIndex] || DEFAULT_SERVER;
 
   // 5-Second Next Episode Auto-Play Countdown state
@@ -115,7 +139,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     }
   });
 
-  // Preferred quality state - Defaults to the highest available source (1080p)
+  // Preferred quality state - Defaults to 1080p
   const [currentQuality, setCurrentQuality] = useState<VideoQuality>(() => {
     try {
       const saved = localStorage.getItem('cinestream_preferred_quality');
@@ -123,19 +147,53 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
         return saved as VideoQuality;
       }
     } catch {}
-    return '1080p'; // Default to highest available source
+    return '1080p';
   });
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isTV = media.type === 'tv' || media.type === 'series';
+  // Resolve Direct TV Serial / Show Streams whenever serial engine is active or episode changes
+  useEffect(() => {
+    let cancelled = false;
+    const shouldFetch = isSerialMedia || useDirectSerialEngine;
+    if (!shouldFetch) return;
+
+    setIsLoadingDirectStreams(true);
+    fetchDirectSerialStreams(media.title, currentSeason, currentEpisode, !isTV)
+      .then((streams) => {
+        if (cancelled) return;
+        setDirectStreams(streams);
+        setSelectedDirectMirror(0);
+        // If no direct streams found for a serial, gracefully fall back to MultiEmbed / AutoEmbed India
+        if (streams.length === 0 && useDirectSerialEngine) {
+          setUseDirectSerialEngine(false);
+          setServerIndex(getPreferredServerIndexForMedia(media));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingDirectStreams(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [media.id, media.title, currentSeason, currentEpisode, isSerialMedia, useDirectSerialEngine, isTV]);
+
+  // Reset states whenever media or episode changes
+  useEffect(() => {
+    setCountdown(null);
+    const serialFlag = isLikelyTvSerial(media);
+    setUseDirectSerialEngine(serialFlag);
+    setServerIndex(getPreferredServerIndexForMedia(media));
+    setErrorToast(null);
+  }, [media.id, currentSeason, currentEpisode]);
 
   // Next episode details computation
   const getNextEpisodeInfo = () => {
     if (!isTV) return null;
     const currentSeasonEps = episodesMap[currentSeason] || [];
-    const maxEpInSeason = currentSeasonEps.length || 24;
+    const maxEpInSeason = currentSeasonEps.length || 30;
 
     if (currentEpisode < maxEpInSeason) {
       const nextEpNum = currentEpisode + 1;
@@ -163,11 +221,10 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
 
   const nextEpInfo = getNextEpisodeInfo();
 
-  // Trigger countdown when video finishes
   const triggerNextEpisodeCountdown = () => {
     if (!isTV || !isAutoPlayEnabled) return;
     const nextInfo = getNextEpisodeInfo();
-    if (!nextInfo) return; // End of series, no next episode
+    if (!nextInfo) return;
     setCountdown(5);
   };
 
@@ -186,28 +243,26 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
   // 5-second countdown timer effect for next episode
   useEffect(() => {
     if (countdown === null) return;
-
     if (countdown <= 0) {
       playNextEpisodeImmediately();
       return;
     }
-
     const timer = setTimeout(() => {
       setCountdown((prev) => (prev !== null ? prev - 1 : null));
     }, 1000);
-
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  // Reset states whenever media or episode changes
-  useEffect(() => {
-    setCountdown(null);
-    setServerIndex(0);
-    setErrorToast(null);
-  }, [media.id, currentSeason, currentEpisode]);
-
-  // Manual Next Server trigger (Explicit user action or user-approved retry)
-  const handleNextServer = (reason?: string) => {
+  // Manual Next Server trigger
+  const handleNextServer = () => {
+    if (useDirectSerialEngine && directStreams.length > 1 && selectedDirectMirror + 1 < directStreams.length) {
+      const nextMirror = selectedDirectMirror + 1;
+      setSelectedDirectMirror(nextMirror);
+      setQualityNotification(`Switched to Direct Serial Mirror #${nextMirror + 1}`);
+      setTimeout(() => setQualityNotification(null), 3000);
+      return;
+    }
+    setUseDirectSerialEngine(false);
     const nextIdx = (serverIndex + 1) % STREAM_SERVERS.length;
     const nextServer = STREAM_SERVERS[nextIdx];
     setServerIndex(nextIdx);
@@ -216,14 +271,22 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     setTimeout(() => setQualityNotification(null), 3000);
   };
 
-  // Select specific server
+  // Select specific standard server
   const handleSelectServerByIndex = (idx: number) => {
-    if (idx === serverIndex) return;
+    setUseDirectSerialEngine(false);
     setServerIndex(idx);
     setShowServerMenu(false);
     setIframeKey((prev) => prev + 1);
     const chosen = STREAM_SERVERS[idx];
     setQualityNotification(`Connected to Server ${idx + 1}: ${chosen.name}`);
+    setTimeout(() => setQualityNotification(null), 3000);
+  };
+
+  // Activate Direct Serial / Hindi Episode Engine
+  const handleActivateDirectSerialEngine = () => {
+    setUseDirectSerialEngine(true);
+    setShowServerMenu(false);
+    setQualityNotification(`Connected to Direct TV Serial & Hindi HD Engine`);
     setTimeout(() => setQualityNotification(null), 3000);
   };
 
@@ -234,7 +297,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     const nextTarget = STREAM_SERVERS[nextIdx];
 
     const toastData: PlaybackErrorToast = {
-      failedServerName: currentFailed.name,
+      failedServerName: useDirectSerialEngine ? 'Direct Serial Stream' : currentFailed.name,
       nextServerName: nextTarget.name,
       attemptNumber: serverIndex + 1,
       totalServers: STREAM_SERVERS.length,
@@ -245,10 +308,10 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     if (errorToastTimerRef.current) clearTimeout(errorToastTimerRef.current);
     errorToastTimerRef.current = setTimeout(() => {
       setErrorToast(null);
-    }, 6000);
+    }, 7000);
   };
 
-  // Listen for iframe postMessage events (detects errors & ended states automatically)
+  // Listen for iframe postMessage events (detects video ended state)
   useEffect(() => {
     const handleWindowMessage = (event: MessageEvent) => {
       try {
@@ -261,12 +324,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
           }
         }
 
-        const rawStr =
-          typeof payload === 'string'
-            ? payload
-            : JSON.stringify(payload || '');
-
-        // Detect video ended
         const isEnded =
           payload === 'ended' ||
           payload === 'video_ended' ||
@@ -282,10 +339,9 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
 
         if (isEnded) {
           triggerNextEpisodeCountdown();
-          return;
         }
       } catch {
-        // ignore malformed message events
+        // ignore
       }
     };
 
@@ -293,23 +349,21 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     return () => window.removeEventListener('message', handleWindowMessage);
   }, [currentSeason, currentEpisode, episodesMap, isAutoPlayEnabled, isTV]);
 
-  // Reliable stream URL computed from active server
-  const streamUrl = activeServer.buildUrl({
-    type: isTV ? 'tv' : 'movie',
-    id: media.id,
-    imdbId: media.imdbId || media.id,
-    tmdbId: media.tmdbId,
-    season: currentSeason,
-    episode: currentEpisode,
-    quality: currentQuality,
-  });
+  // Compute active stream URL (either Direct TV Serial Engine or selected TMDB/IMDb Server)
+  const activeDirectStream = directStreams[selectedDirectMirror];
+  const streamUrl =
+    useDirectSerialEngine && activeDirectStream
+      ? activeDirectStream.embedUrl
+      : activeServer.buildUrl({
+          type: isTV ? 'tv' : 'movie',
+          id: media.id,
+          imdbId: media.imdbId || media.id,
+          tmdbId: media.tmdbId,
+          season: currentSeason,
+          episode: currentEpisode,
+          quality: currentQuality,
+        });
 
-  // Seamless 1-Click Alternate Source Switcher
-  const handleSwitchAlternateSource = () => {
-    handleNextServer('Manual switch requested');
-  };
-
-  // Reload current stream
   const handleReloadStream = () => {
     setIframeKey((prev) => prev + 1);
     setQualityNotification('Reloading video stream...');
@@ -320,7 +374,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 's' || e.key === 'S') {
-        handleNextServer('Remote key S pressed');
+        handleNextServer();
       } else if (e.key === 'r' || e.key === 'R') {
         handleReloadStream();
       } else if (e.key === 'q' || e.key === 'Q') {
@@ -329,9 +383,8 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [serverIndex]);
+  }, [serverIndex, useDirectSerialEngine, selectedDirectMirror, directStreams.length]);
 
-  // Quality switch handler
   const handleQualityChange = (q: VideoQuality) => {
     setCurrentQuality(q);
     setShowQualityMenu(false);
@@ -351,7 +404,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
 
   // Episode navigation
   const currentSeasonEpisodes = episodesMap[currentSeason] || [];
-  const maxEpisodeInSeason = currentSeasonEpisodes.length || 24;
+  const maxEpisodeInSeason = currentSeasonEpisodes.length || 30;
 
   const handlePrevEp = () => {
     if (currentEpisode > 1) {
@@ -373,7 +426,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     }
   };
 
-  // Fullscreen toggle
   const toggleFullscreen = () => {
     if (!playerContainerRef.current) return;
     if (!document.fullscreenElement) {
@@ -391,7 +443,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     }
   };
 
-  // Idle timer to auto-hide player chrome overlay after 6s during playback
   const resetIdleTimer = () => {
     setShowControlsOverlay(true);
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -399,7 +450,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
       setShowControlsOverlay(false);
       setShowQualityMenu(false);
       setShowServerMenu(false);
-    }, 6000);
+    }, 6500);
   };
 
   useEffect(() => {
@@ -413,18 +464,17 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     <div
       ref={playerContainerRef}
       onMouseMove={resetIdleTimer}
+      onTouchStart={resetIdleTimer}
       className={`relative w-full bg-black flex flex-col text-slate-100 ${
-        isFullscreen ? 'fixed inset-0 z-50 h-screen w-screen' : 'min-h-[85vh]'
+        isFullscreen ? 'fixed inset-0 z-50 h-screen w-screen' : ''
       }`}
     >
-      {/* 5-Second Next Episode Countdown Overlay (Netflix Style) */}
+      {/* 5-Second Next Episode Countdown Overlay */}
       {countdown !== null && nextEpInfo && (
         <div className="absolute inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-lg w-full p-6 sm:p-8 text-center shadow-2xl relative overflow-hidden space-y-5">
-            {/* Ambient Background Glow */}
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-lg w-full p-5 sm:p-8 text-center shadow-2xl relative overflow-hidden space-y-5">
             <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-48 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Circular Countdown Progress Ring */}
             <div className="flex flex-col items-center justify-center space-y-3">
               <div className="relative w-20 h-20 flex items-center justify-center">
                 <svg className="w-20 h-20 -rotate-90">
@@ -465,7 +515,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
               </div>
             </div>
 
-            {/* Next Episode Preview Card */}
             <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-left">
               <div className="relative w-24 h-16 rounded-xl overflow-hidden bg-slate-850 shrink-0">
                 {nextEpInfo.thumbnail ? (
@@ -499,7 +548,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex items-center justify-center gap-3 pt-1">
               <button
                 onClick={playNextEpisodeImmediately}
@@ -522,7 +570,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
 
       {/* Playback Error Alert Toast with 1-Click Server Switch Action */}
       {errorToast && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 max-w-lg w-[94%] sm:w-auto bg-slate-900/95 border-2 border-amber-500/80 rounded-2xl p-3.5 sm:p-4 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-200">
+        <div className="absolute top-14 sm:top-16 left-1/2 -translate-x-1/2 z-50 max-w-lg w-[94%] sm:w-auto bg-slate-900/95 border-2 border-amber-500/80 rounded-2xl p-3 sm:p-4 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-4 duration-200">
           <div className="flex items-start gap-3">
             <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5 border border-amber-500/30">
               <AlertTriangle className="w-5 h-5 text-amber-400" />
@@ -530,16 +578,26 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                  Playback Issue
+                  Stream Switcher
                 </span>
                 <span className="text-[11px] font-mono text-slate-400">
                   Server {errorToast.attemptNumber}/{errorToast.totalServers}
                 </span>
               </div>
               <p className="text-xs sm:text-sm font-semibold text-white mt-0.5">
-                Stream not loading on <span className="text-amber-300 font-bold">{errorToast.failedServerName}</span>
+                Not playing on <span className="text-amber-300 font-bold">{errorToast.failedServerName}</span>?
               </p>
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <button
+                  onClick={() => {
+                    handleActivateDirectSerialEngine();
+                    setErrorToast(null);
+                  }}
+                  className="tv-focus px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1 shadow-md"
+                >
+                  <Radio className="w-3.5 h-3.5" />
+                  <span>Try Direct Hindi/Serial Engine</span>
+                </button>
                 <button
                   onClick={() => {
                     handleNextServer();
@@ -549,12 +607,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                 >
                   <Zap className="w-3.5 h-3.5 fill-slate-950" />
                   <span>Switch to {errorToast.nextServerName}</span>
-                </button>
-                <button
-                  onClick={() => handleReloadStream()}
-                  className="tv-focus px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold border border-slate-700"
-                >
-                  Retry Current
                 </button>
               </div>
             </div>
@@ -571,9 +623,9 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
 
       {/* Quality & Stream Toast Notification */}
       {qualityNotification && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 border border-amber-500/40 text-amber-300 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-2xl backdrop-blur-md flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          <span>{qualityNotification}</span>
+        <div className="absolute top-14 sm:top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 border border-amber-500/40 text-amber-300 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-2xl backdrop-blur-md flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200 max-w-[92vw] truncate">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="truncate">{qualityNotification}</span>
         </div>
       )}
 
@@ -581,44 +633,60 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
       <div
         className={`transition-opacity duration-300 z-30 ${
           showControlsOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        } bg-gradient-to-b from-slate-950/95 via-slate-950/75 to-transparent px-4 py-3 sm:px-6 flex items-center justify-between gap-3`}
+        } bg-gradient-to-b from-slate-950/95 via-slate-950/80 to-transparent px-3 py-2.5 sm:px-6 sm:py-3 flex items-center justify-between gap-2`}
       >
         {/* Left: Back & Title */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             onClick={onBack}
-            className="tv-focus flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm border border-slate-700 shadow-md"
+            className="tv-focus flex items-center gap-1.5 px-2.5 py-2 sm:px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm border border-slate-700 shadow-md shrink-0"
             title="Back to Catalog (Esc / Back button)"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Browse</span>
+            <span className="hidden xs:inline">Back</span>
           </button>
 
-          <div>
-            <h2 className="text-sm sm:text-base font-bold text-white line-clamp-1 font-display">
+          <div className="min-w-0">
+            <h2 className="text-xs sm:text-base font-bold text-white truncate font-display">
               {media.title}
             </h2>
-            <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-slate-400 font-medium truncate">
               {isTV ? (
-                <span className="text-amber-400 font-semibold">
-                  Season {currentSeason} · Episode {currentEpisode}
+                <span className="text-amber-400 font-semibold shrink-0">
+                  S{currentSeason} · Ep {currentEpisode}
                 </span>
               ) : (
-                <span>Movie · {media.year || '1080p'}</span>
+                <span className="shrink-0">Movie · {media.year || 'HD'}</span>
               )}
               <span aria-hidden="true" className="text-slate-600">·</span>
-              <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span>Server {serverIndex + 1}: {activeServer.name.split('(')[0].trim()}</span>
+              <span className="text-emerald-400 font-semibold flex items-center gap-1 truncate">
+                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 shrink-0" />
+                <span className="truncate">
+                  {useDirectSerialEngine && activeDirectStream
+                    ? `Direct TV Serial HD (Mirror ${selectedDirectMirror + 1})`
+                    : `Server ${serverIndex + 1}: ${activeServer.name.split('(')[0].trim()}`}
+                </span>
               </span>
-              <span aria-hidden="true" className="text-slate-600">·</span>
-              <span className="text-amber-400 font-mono font-bold">{currentQuality.toUpperCase()}</span>
             </div>
           </div>
         </div>
 
         {/* Right: Server Selector Dropdown, Quality Selector, Next Server & Fullscreen */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Direct TV Serial Engine Quick Toggle Button */}
+          <button
+            onClick={handleActivateDirectSerialEngine}
+            className={`tv-focus hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+              useDirectSerialEngine
+                ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/20'
+                : 'bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border-emerald-500/40'
+            }`}
+            title="Direct Episode Engine for Indian TV Serials & Daily Shows"
+          >
+            <Radio className="w-3.5 h-3.5" />
+            <span>TV Serial Engine</span>
+          </button>
+
           {/* Server Selector Dropdown */}
           <div className="relative">
             <button
@@ -626,23 +694,45 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                 setShowServerMenu((prev) => !prev);
                 setShowQualityMenu(false);
               }}
-              className="tv-focus flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-bold border border-slate-700 shadow-md transition-all"
+              className="tv-focus flex items-center gap-1 px-2.5 sm:px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-bold border border-slate-700 shadow-md transition-all"
               title="Select Streaming Server"
             >
               <Layers className="w-3.5 h-3.5 text-amber-400" />
-              <span>Server {serverIndex + 1}</span>
+              <span>{useDirectSerialEngine ? 'Serial HD' : `Srv ${serverIndex + 1}`}</span>
             </button>
 
             {showServerMenu && (
-              <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border border-slate-700/80 rounded-2xl p-2 shadow-2xl z-50 text-left space-y-1">
+              <div className="absolute right-0 top-full mt-2 w-72 max-h-[75vh] overflow-y-auto bg-slate-900 border border-slate-700/80 rounded-2xl p-2 shadow-2xl z-50 text-left space-y-1">
                 <div className="px-3 py-2 border-b border-slate-800">
                   <span className="text-xs font-bold text-white">Choose Stream Server</span>
                   <p className="text-[10px] text-slate-400 mt-0.5">
-                    Click to switch if a server does not play
+                    Switch instantly if a show or serial gives an error
                   </p>
                 </div>
+
+                {/* Special Direct TV Serial Engine Option */}
+                <button
+                  onClick={handleActivateDirectSerialEngine}
+                  className={`tv-focus w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-colors ${
+                    useDirectSerialEngine
+                      ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40'
+                      : 'text-emerald-400 hover:bg-slate-850 border border-emerald-500/20'
+                  }`}
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="text-xs font-bold flex items-center gap-1.5">
+                      <Radio className="w-3.5 h-3.5 shrink-0" />
+                      <span>Direct TV Serial & Hindi Engine</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      Best for Indian TV Serials (TMKOC, CID, Ali Baba, Anupamaa)
+                    </div>
+                  </div>
+                  {useDirectSerialEngine && <Check className="w-4 h-4 text-emerald-400 shrink-0" />}
+                </button>
+
                 {STREAM_SERVERS.map((srv, idx) => {
-                  const isCurrent = idx === serverIndex;
+                  const isCurrent = !useDirectSerialEngine && idx === serverIndex;
                   return (
                     <button
                       key={srv.id}
@@ -669,21 +759,20 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             )}
           </div>
 
-          {/* Manual Quality Selector Button & Dropdown */}
+          {/* Quality Selector */}
           <div className="relative">
             <button
               onClick={() => {
                 setShowQualityMenu((prev) => !prev);
                 setShowServerMenu(false);
               }}
-              className="tv-focus flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-bold border border-slate-700 shadow-md transition-all"
-              title="Manual Quality Selector: 1080p, 720p, 360p, Auto (Shortcut: Q)"
+              className="tv-focus flex items-center gap-1 px-2.5 sm:px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-bold border border-slate-700 shadow-md transition-all"
+              title="Manual Quality Selector: 1080p, 720p, 360p, Auto"
             >
               <Settings2 className="w-3.5 h-3.5 text-amber-400" />
               <span>{currentQuality.toUpperCase()}</span>
             </button>
 
-            {/* Quality Dropdown Menu */}
             {showQualityMenu && (
               <div className="absolute right-0 top-full mt-2 w-64 bg-slate-900 border border-slate-700/80 rounded-2xl p-2 shadow-2xl z-50 text-left space-y-1">
                 <div className="px-3 py-2 border-b border-slate-800">
@@ -691,9 +780,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                     <span>Select Resolution</span>
                     <span className="text-[10px] text-amber-400 font-mono">1080p Default</span>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    Stream defaults to highest available source
-                  </p>
                 </div>
                 {QUALITY_OPTIONS.map((opt) => {
                   const isSelected = currentQuality === opt.id;
@@ -710,9 +796,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                       <div>
                         <div className="text-xs font-bold flex items-center gap-1.5">
                           <span>{opt.label}</span>
-                          <span className="text-[10px] font-normal text-slate-400 font-mono">
-                            ({opt.resolution})
-                          </span>
                         </div>
                         <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">
                           {opt.description}
@@ -726,24 +809,14 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             )}
           </div>
 
-          {/* 1-Click Next Server Switcher (Shortcut: S) */}
+          {/* 1-Click Next Server Switcher */}
           <button
-            onClick={handleSwitchAlternateSource}
-            className="tv-focus flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md shadow-amber-500/20 transition-all"
-            title="Next Server (Shortcut: S)"
+            onClick={handleNextServer}
+            className="tv-focus flex items-center gap-1 px-2.5 sm:px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md shadow-amber-500/20 transition-all"
+            title="Switch to Next Working Server (Shortcut: S)"
           >
             <Zap className="w-3.5 h-3.5 fill-slate-950" />
             <span className="hidden sm:inline">Next Server</span>
-          </button>
-
-          {/* Reload Stream Button */}
-          <button
-            onClick={handleReloadStream}
-            className="tv-focus hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 shadow-md"
-            title="Reload video stream (Shortcut: R)"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-            <span>Reload</span>
           </button>
 
           {/* Fullscreen Button */}
@@ -757,32 +830,107 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
         </div>
       </div>
 
-      {/* Main Streaming Iframe Container with Permissive Setup (Plays directly on page across Phone, Tablet, Laptop, TV) */}
-      <div className="relative flex-1 w-full bg-black flex items-center justify-center overflow-hidden aspect-video sm:aspect-auto sm:min-h-[75vh]">
-        <iframe
-          key={`${iframeKey}-${streamUrl}-${currentQuality}`}
-          src={streamUrl}
-          title={media.title}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-          allowFullScreen
-          referrerPolicy="origin"
-          onError={() => handlePlaybackErrorNotice('Stream connection failed')}
-          className="w-full h-full border-0 bg-black"
-        />
+      {/* Main Streaming Video Container (Responsive 16:9 on mobile, Theater height on TV/Desktop) */}
+      <div
+        className={`relative w-full bg-black flex items-center justify-center overflow-hidden ${
+          isFullscreen ? 'flex-1 h-full' : 'aspect-video sm:aspect-auto sm:h-[72vh] lg:h-[78vh]'
+        }`}
+      >
+        {isLoadingDirectStreams && useDirectSerialEngine ? (
+          <div className="flex flex-col items-center justify-center gap-3 text-center p-6">
+            <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+            <p className="text-xs sm:text-sm font-semibold text-slate-200">
+              Loading Direct HD Episode Stream for {media.title} (Ep {currentEpisode})...
+            </p>
+          </div>
+        ) : (
+          <iframe
+            key={`${iframeKey}-${streamUrl}-${currentQuality}`}
+            src={streamUrl}
+            title={media.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+            allowFullScreen
+            referrerPolicy="origin"
+            onError={() => handlePlaybackErrorNotice('Stream connection failed')}
+            className="w-full h-full border-0 bg-black"
+          />
+        )}
       </div>
 
-      {/* TV Series Episode Jumper Bar (docked below player or on TV screen) */}
+      {/* Quick Server & TV Serial Switcher Strip (Always accessible on Mobile, Tablet & Smart TV) */}
+      {!isFullscreen && (
+        <div className="bg-slate-950 border-t border-slate-800/90 px-3 py-2.5 sm:px-6 flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span>Servers:</span>
+          </span>
+
+          {/* Direct Serial & Hindi Engine Pill */}
+          <button
+            onClick={handleActivateDirectSerialEngine}
+            data-tv-nav="true"
+            className={`tv-focus px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-all ${
+              useDirectSerialEngine
+                ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                : 'bg-slate-900 text-emerald-400 border border-emerald-500/30 hover:bg-slate-800'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5" />
+            <span>TV Serial / Hindi Direct HD</span>
+          </button>
+
+          {/* If Direct Serial Engine is active and has multiple mirrors, show Mirror pills */}
+          {useDirectSerialEngine &&
+            directStreams.length > 1 &&
+            directStreams.slice(0, 5).map((ds, mIdx) => (
+              <button
+                key={ds.id}
+                onClick={() => setSelectedDirectMirror(mIdx)}
+                data-tv-nav="true"
+                className={`tv-focus px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
+                  selectedDirectMirror === mIdx
+                    ? 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/50'
+                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                Ep Mirror #{mIdx + 1}
+              </button>
+            ))}
+
+          {/* Standard 8 OTT/Multi-Audio Servers */}
+          {STREAM_SERVERS.map((srv, idx) => {
+            const active = !useDirectSerialEngine && serverIndex === idx;
+            return (
+              <button
+                key={srv.id}
+                onClick={() => handleSelectServerByIndex(idx)}
+                data-tv-nav="true"
+                className={`tv-focus px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
+                  active
+                    ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20'
+                    : 'bg-slate-900 text-slate-300 hover:text-white border border-slate-800'
+                }`}
+              >
+                Srv {idx + 1}: {srv.name.split('(')[0].trim()}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* TV Series / Serial Episode Jumper Bar */}
       {isTV && (
         <div
           className={`transition-opacity duration-300 z-30 ${
-            showControlsOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'
-          } bg-slate-950/95 border-t border-slate-800/80 px-4 py-2.5 sm:px-6 flex flex-wrap items-center justify-between gap-3`}
+            showControlsOverlay || !isFullscreen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          } bg-slate-950/95 border-t border-slate-800/80 px-3 py-2.5 sm:px-6 flex flex-wrap items-center justify-between gap-2`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             <button
               onClick={handlePrevEp}
               disabled={currentSeason === 1 && currentEpisode === 1}
-              className="tv-focus flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none text-xs font-semibold text-slate-300 border border-slate-800"
+              data-tv-nav="true"
+              className="tv-focus flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none text-xs font-semibold text-slate-300 border border-slate-800"
               title="Previous Episode (P)"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -791,39 +939,32 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
 
             <button
               onClick={() => setShowEpisodeModal(true)}
-              className="tv-focus flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs font-bold text-amber-400 border border-slate-700"
+              data-tv-nav="true"
+              className="tv-focus flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-xs font-bold text-amber-400 border border-amber-500/30"
               title="Select Season and Episode"
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>S{currentSeason} : E{currentEpisode}</span>
+              <span>
+                Season {currentSeason} · Ep {currentEpisode} (All Episodes)
+              </span>
             </button>
 
             <button
               onClick={handleNextEp}
-              className="tv-focus flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-slate-300 border border-slate-800"
+              data-tv-nav="true"
+              className="tv-focus flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-slate-300 border border-slate-800"
               title="Next Episode (N)"
             >
               <span>Next Ep</span>
               <ChevronRight className="w-4 h-4" />
             </button>
-
-            {/* Test 5s Countdown Button */}
-            {nextEpInfo && (
-              <button
-                onClick={triggerNextEpisodeCountdown}
-                className="tv-focus hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-slate-400 hover:text-amber-400 border border-slate-800"
-                title="Test 5-Second Auto-Play Next Countdown"
-              >
-                <Timer className="w-3.5 h-3.5" />
-                <span>Test Next Ep Countdown</span>
-              </button>
-            )}
           </div>
 
           <div className="flex items-center gap-4 text-xs text-slate-400">
-            {/* Auto-Play Next Toggle */}
             <label className="flex items-center gap-2 cursor-pointer select-none">
-              <span className="text-slate-300 font-medium">Auto-Play Next Episode:</span>
+              <span className="text-slate-300 font-medium text-[11px] sm:text-xs">
+                Auto-Next Ep:
+              </span>
               <button
                 type="button"
                 role="switch"
@@ -850,40 +991,36 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             </label>
 
             <span className="hidden lg:inline text-slate-500">
-              Keys: <strong>S</strong> (Switch Source), <strong>Q</strong> (Quality), <strong>N</strong> (Next Ep), <strong>P</strong> (Prev Ep), <strong>F</strong> (Fullscreen)
+              Remote Keys: <strong>S</strong> (Switch Server), <strong>Q</strong> (Quality),{' '}
+              <strong>N / CH+</strong> (Next Ep), <strong>P / CH-</strong> (Prev Ep)
             </span>
           </div>
         </div>
       )}
 
-      {/* Quality Ribbon & TV Info Dock (shown when not fullscreen) */}
+      {/* Quality & Info Dock (shown when not fullscreen) */}
       {!isFullscreen && (
-        <div className="bg-slate-950 px-4 py-4 sm:px-6 lg:px-8 border-t border-slate-800 space-y-3">
-          {/* Quality Selector Ribbon */}
+        <div className="bg-slate-950 px-3 py-3 sm:px-6 lg:px-8 border-t border-slate-800 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
               <Settings2 className="w-4 h-4 text-amber-400" />
-              <span>Stream Quality:</span>
+              <span>Resolution:</span>
             </div>
 
-            {/* Quality Switcher Buttons */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               {QUALITY_OPTIONS.map((opt) => {
                 const active = currentQuality === opt.id;
                 return (
                   <button
                     key={opt.id}
                     onClick={() => handleQualityChange(opt.id)}
-                    className={`tv-focus px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    className={`tv-focus px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                       active
                         ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                         : 'bg-slate-800/90 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700/60'
                     }`}
                   >
                     {opt.id.toUpperCase()}
-                    {opt.id === '1080p' && (
-                      <span className="ml-1 text-[10px] opacity-80">(Highest)</span>
-                    )}
                   </button>
                 );
               })}
@@ -891,30 +1028,30 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
 
             <div className="flex items-center gap-3">
               <button
-                onClick={handleSwitchAlternateSource}
+                onClick={handleReloadStream}
                 className="tv-focus flex items-center gap-1 text-[11px] text-amber-400 hover:text-amber-300 font-semibold"
               >
-                <Zap className="w-3 h-3" />
-                <span>Switch Alternate Source (#{serverIndex + 1})</span>
+                <RefreshCw className="w-3 h-3" />
+                <span>Reload Player</span>
               </button>
-              <span className="text-[11px] text-emerald-400 font-medium">
-                1080p Stream Active
+              <span className="text-[11px] text-emerald-400 font-medium hidden sm:inline">
+                1080p HD Active
               </span>
             </div>
           </div>
 
-          {/* Hindi / Auto-Play / TV Remote Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 text-[11px] text-slate-400">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-slate-400">
             <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-start gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+              <Tv className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-slate-200">Zero Server Failure Engine:</strong> If any upstream stream buffers or reports an error, press <strong>"Alternate Source"</strong> or remote key <strong>S</strong> to auto-switch to a redundant high-speed CDN.
+                <strong className="text-slate-200">TV Serials & Daily Soaps Fixed:</strong> If a TV serial or Hindi show says "Unavailable" on western servers, tap{' '}
+                <strong className="text-emerald-400">"TV Serial / Hindi Direct HD"</strong> above to stream full episodes directly.
               </div>
             </div>
             <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-start gap-2">
-              <Volume2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+              <Volume2 className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-slate-200">Hindi & Multi-Audio:</strong> Primary stream engine automatically loads native Hindi audio and multi-language subs.
+                <strong className="text-slate-200">Airtel Xstream Box & Smart TV Ready:</strong> Use your remote D-Pad or press <strong>S</strong> to switch servers and <strong>CH+ / CH-</strong> to change episodes.
               </div>
             </div>
           </div>

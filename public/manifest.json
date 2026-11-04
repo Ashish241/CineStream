@@ -1,0 +1,56 @@
+{
+  "id": "/",
+  "name": "CineStream TV & Mobile - 1080p OTT & Serials",
+  "short_name": "CineStream",
+  "description": "Stream Unlimited New & Classic Movies, Web Series, Live OTT Originals, Hindi TV Serials & Anime in 1080p HD. Optimized for Airtel Xstream Box, Smart TV, and Mobile.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "categories": ["entertainment", "video", "movies", "tv"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Releases",
+      "short_name": "New",
+      "description": "Watch latest movies and web series",
+      "url": "/?tab=all",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "TV Serials",
+      "short_name": "Serials",
+      "description": "Watch Indian TV Serials & Daily Soaps",
+      "url": "/?tab=serials",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    }
+  ]
+}

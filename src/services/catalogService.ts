@@ -7,13 +7,22 @@ import {
   NEW_2026_RELEASES,
   TRENDING_MOVIES,
   TRENDING_SERIES,
+  TV_SERIALS_COLLECTION,
 } from '../data/curatedCatalog';
 import { IMDB_TO_TMDB_MAP } from '../data/servers';
-
 import { containsDevanagari, convertHindiToEnglish } from '../utils/hindiTransliteration';
 
 // Cinemeta Stremio open catalog endpoints (free, CORS-enabled, no API key needed)
 const CINEMETA_BASE = 'https://v3-cinemeta.strem.io';
+const TMDB_KEY = '8265bd1679663a7ea12ac168da84d2e8';
+
+export interface DirectSerialStream {
+  id: string;
+  title: string;
+  embedUrl: string;
+  duration: number;
+  thumbnail?: string;
+}
 
 interface CinemetaMetaResponse {
   meta?: {
@@ -53,6 +62,63 @@ interface CinemetaCatalogResponse {
   }>;
 }
 
+// Known Indian TV Serials / Daily Soaps keywords or IDs for automatic Serial Engine detection
+const SERIAL_TITLE_PATTERNS = [
+  'taarak mehta',
+  'tarak mehta',
+  'tmkoc',
+  'ali baba',
+  '40 bhoot',
+  'dastaan-e-kabul',
+  'anupama',
+  'yeh rishta',
+  'cid',
+  'baalveer',
+  'aladdin',
+  'wagle ki duniya',
+  'pushpa impossible',
+  'bhabiji ghar par',
+  'sarabhai vs sarabhai',
+  'khichdi',
+  'crime patrol',
+  'savdhaan india',
+  'kumkum bhagya',
+  'kundali bhagya',
+  'bhagya lakshmi',
+  'ghoom hai kisikey',
+  'jhanak',
+  'udne ki aasha',
+  'tenali rama',
+  'chakravartin ashoka',
+  'devon ke dev',
+  'radhakrishn',
+  'shrimad ramayan',
+  'ramayan',
+  'mahabharat',
+  'shaktimaan',
+  'ahat',
+  'fir ',
+  'lapataganj',
+  'chidiya ghar',
+  'maddam sir',
+  'naagin',
+  'bigg boss',
+  'kapil sharma',
+  'indian idol',
+  'shark tank india',
+  'kaun banega crorepati',
+];
+
+export function isLikelyTvSerial(media: MediaItem): boolean {
+  if (media.isSerial || media.category === 'serials') return true;
+  const serialMatch = TV_SERIALS_COLLECTION.some(
+    (s) => s.id === media.id || s.imdbId === media.id || s.tmdbId === media.id || s.tmdbId === media.tmdbId
+  );
+  if (serialMatch) return true;
+  const lowerTitle = (media.title || '').toLowerCase();
+  return SERIAL_TITLE_PATTERNS.some((p) => lowerTitle.includes(p));
+}
+
 // Phonetic and typo-tolerant search normalizer (preserves Devanagari letters)
 function normalizeSearch(text: string): string {
   return text
@@ -63,6 +129,49 @@ function normalizeSearch(text: string): string {
     .replace(/sh/g, 's')
     .replace(/ee/g, 'i')
     .replace(/oo/g, 'u');
+}
+
+// Convert TMDB raw item into MediaItem
+function mapTmdbItemToMedia(item: any, forcedType?: 'movie' | 'tv'): MediaItem | null {
+  if (!item || !item.id || (!item.poster_path && !item.backdrop_path)) return null;
+  const isTv = forcedType ? forcedType === 'tv' : item.media_type === 'tv' || Boolean(item.first_air_date || item.name);
+  let title = isTv ? item.name || item.original_name : item.title || item.original_title;
+  const tmdbIdStr = String(item.id);
+
+  // Preserve requested display title for Ali Baba Aur 40 Bhoot
+  if (tmdbIdStr === '208744' || (title && title.toLowerCase().includes('dastaan-e-kabul'))) {
+    title = 'Ali Baba Aur 40 Bhoot';
+  }
+
+  const date = isTv ? item.first_air_date : item.release_date;
+  const year = date ? String(date).slice(0, 4) : '';
+
+  const mediaItem: MediaItem = {
+    id: tmdbIdStr,
+    tmdbId: tmdbIdStr,
+    imdbId: tmdbIdStr,
+    title: title || 'Untitled',
+    type: isTv ? 'tv' : 'movie',
+    poster: item.poster_path
+      ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+      : `https://image.tmdb.org/t/p/w780${item.backdrop_path}`,
+    backdrop: item.backdrop_path
+      ? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}`
+      : item.poster_path
+      ? `https://image.tmdb.org/t/p/w780${item.poster_path}`
+      : undefined,
+    year,
+    rating: item.vote_average ? String(Number(item.vote_average).toFixed(1)) : '7.8',
+    overview: item.overview || '',
+    genres: [],
+  };
+
+  if (isLikelyTvSerial(mediaItem)) {
+    mediaItem.isSerial = true;
+    mediaItem.category = 'serials';
+  }
+
+  return mediaItem;
 }
 
 // Fallback search in curated catalog with alias matching and fuzzy phonetic support
@@ -76,6 +185,7 @@ function searchLocalCatalog(query: string): MediaItem[] {
   const all = [
     ...HERO_FEATURED_ITEMS,
     ...NEW_2026_RELEASES,
+    ...TV_SERIALS_COLLECTION,
     ...ALL_TIME_CLASSICS,
     ...TRENDING_SERIES,
     ...TRENDING_MOVIES,
@@ -89,7 +199,6 @@ function searchLocalCatalog(query: string): MediaItem[] {
     const normTitle = normalizeSearch(item.title);
     const itemOverview = (item.overview || '').toLowerCase();
 
-    // Check alias list (e.g. 'पंचायत', 'mirjapur', 'gramchitshalay', '40 bhoot', 'ali baba', 'panchayat 4', etc.)
     const matchesAlias = item.aliases?.some((alias) => {
       const aLower = alias.toLowerCase();
       const aNorm = normalizeSearch(alias);
@@ -123,13 +232,12 @@ function searchLocalCatalog(query: string): MediaItem[] {
 }
 
 /**
- * Searches movies and web series by title or IMDb ID
+ * Searches movies, web series, anime, and TV serials by title or IMDb/TMDB ID
  */
 export async function searchCatalog(query: string): Promise<MediaItem[]> {
   const cleanQuery = query.trim();
   if (!cleanQuery) return [];
 
-  // If query is an IMDb ID (e.g. tt1234567), directly query details or return direct stub
   if (/^tt\d+$/i.test(cleanQuery)) {
     try {
       const details = await fetchMediaDetails('movie', cleanQuery);
@@ -139,11 +247,9 @@ export async function searchCatalog(query: string): Promise<MediaItem[]> {
     }
   }
 
-  // Detect Hindi and transliterate to English for global databases (TMDB/Cinemeta)
   const isHindi = containsDevanagari(cleanQuery);
   const englishQuery = isHindi ? convertHindiToEnglish(cleanQuery) : cleanQuery;
 
-  // Check local curated items first with phonetic / alias matching (check both Hindi and English forms)
   const localMatches = searchLocalCatalog(cleanQuery);
   const englishLocalMatches = isHindi && englishQuery !== cleanQuery ? searchLocalCatalog(englishQuery) : [];
 
@@ -152,14 +258,14 @@ export async function searchCatalog(query: string): Promise<MediaItem[]> {
   englishLocalMatches.forEach((m) => initialMatchesMap.set(m.id, m));
 
   try {
-    // Search TMDB using the English / Romanized query (which TMDB indexes best)
     const encodedEnglish = encodeURIComponent(englishQuery);
-    const TMDB_KEY = '8265bd1679663a7ea12ac168da84d2e8';
 
-    // Concurrently query live TMDB API and Cinemeta for complete real-time global coverage
-    const [tmdbRes, movieRes, seriesRes] = await Promise.allSettled([
+    const [tmdbRes, tmdbPage2Res, movieRes, seriesRes] = await Promise.allSettled([
       fetch(
-        `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_KEY}&query=${encodedEnglish}&include_adult=false`
+        `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_KEY}&query=${encodedEnglish}&include_adult=false&page=1`
+      ).then((r) => (r.ok ? r.json() : null)),
+      fetch(
+        `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_KEY}&query=${encodedEnglish}&include_adult=false&page=2`
       ).then((r) => (r.ok ? r.json() : null)),
       fetch(`${CINEMETA_BASE}/catalog/movie/top/search=${encodedEnglish}.json`, {
         headers: { Accept: 'application/json' },
@@ -171,34 +277,19 @@ export async function searchCatalog(query: string): Promise<MediaItem[]> {
 
     const remoteItems: MediaItem[] = [];
 
-    // Live TMDB Results (Instant automatic discovery of any newly released movie or TV series)
-    if (tmdbRes.status === 'fulfilled' && tmdbRes.value?.results) {
-      for (const item of tmdbRes.value.results) {
+    const processTmdbResults = (results: any[]) => {
+      for (const item of results) {
         if (!item.id || (item.media_type !== 'movie' && item.media_type !== 'tv')) continue;
-        const isTv = item.media_type === 'tv';
-        const title = isTv ? item.name : item.title;
-        const date = isTv ? item.first_air_date : item.release_date;
-        const year = date ? String(date).slice(0, 4) : '';
-        const tmdbIdStr = String(item.id);
-
-        remoteItems.push({
-          id: tmdbIdStr,
-          tmdbId: tmdbIdStr,
-          imdbId: tmdbIdStr,
-          title: title || 'Untitled',
-          type: isTv ? 'tv' : 'movie',
-          poster: item.poster_path
-            ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
-            : 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&auto=format&fit=crop',
-          backdrop: item.backdrop_path
-            ? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}`
-            : undefined,
-          year,
-          rating: item.vote_average ? String(item.vote_average.toFixed(1)) : '7.5',
-          overview: item.overview || '',
-          genres: [],
-        });
+        const mapped = mapTmdbItemToMedia(item);
+        if (mapped) remoteItems.push(mapped);
       }
+    };
+
+    if (tmdbRes.status === 'fulfilled' && tmdbRes.value?.results) {
+      processTmdbResults(tmdbRes.value.results);
+    }
+    if (tmdbPage2Res.status === 'fulfilled' && tmdbPage2Res.value?.results) {
+      processTmdbResults(tmdbPage2Res.value.results);
     }
 
     if (movieRes.status === 'fulfilled' && movieRes.value?.metas) {
@@ -221,21 +312,25 @@ export async function searchCatalog(query: string): Promise<MediaItem[]> {
     if (seriesRes.status === 'fulfilled' && seriesRes.value?.metas) {
       for (const s of seriesRes.value.metas) {
         if (!s.id) continue;
-        remoteItems.push({
+        const item: MediaItem = {
           id: s.id,
           imdbId: s.id,
-          title: s.name || 'Untitled Series',
+          title: s.name === 'Ali Baba: Dastaan-E-Kabul' ? 'Ali Baba Aur 40 Bhoot' : s.name || 'Untitled Series',
           type: 'tv',
           poster: s.poster || 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=500&auto=format&fit=crop',
           year: s.releaseInfo || '',
           rating: s.imdbRating || '',
           overview: s.description || '',
           genres: s.genres || [],
-        });
+        };
+        if (isLikelyTvSerial(item)) {
+          item.isSerial = true;
+          item.category = 'serials';
+        }
+        remoteItems.push(item);
       }
     }
 
-    // Merge without duplicates (favoring local high-res curated items first)
     const combinedMap = new Map<string, MediaItem>(initialMatchesMap);
     remoteItems.forEach((item) => {
       if (!combinedMap.has(item.id)) {
@@ -248,6 +343,269 @@ export async function searchCatalog(query: string): Promise<MediaItem[]> {
     console.warn('Network search failed, returning local catalog matches', err);
     return Array.from(initialMatchesMap.values());
   }
+}
+
+/**
+ * Fetches live auto-updating feeds from TMDB so newly released movies, web series,
+ * Indian OTT releases, TV serials, and anime automatically appear on the home screen!
+ */
+export async function fetchLiveHomeFeeds(): Promise<{
+  trendingToday: MediaItem[];
+  newIndianReleases: MediaItem[];
+  liveMovies: MediaItem[];
+  liveSeries: MediaItem[];
+  liveSerials: MediaItem[];
+  liveAnime: MediaItem[];
+}> {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const [trendingRes, indianMoviesRes, indianTvRes, moviesRes, seriesRes, serialsRes, animeRes] =
+      await Promise.allSettled([
+        fetch(`https://api.themoviedb.org/3/trending/all/day?api_key=${TMDB_KEY}`).then((r) =>
+          r.ok ? r.json() : null
+        ),
+        fetch(
+          `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&with_original_language=hi&sort_by=primary_release_date.desc&primary_release_date.lte=${today}&vote_count.gte=5&page=1`
+        ).then((r) => (r.ok ? r.json() : null)),
+        fetch(
+          `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_KEY}&with_original_language=hi&sort_by=first_air_date.desc&first_air_date.lte=${today}&page=1`
+        ).then((r) => (r.ok ? r.json() : null)),
+        fetch(`https://api.themoviedb.org/3/movie/now_playing?api_key=${TMDB_KEY}&region=IN&page=1`).then((r) =>
+          r.ok ? r.json() : null
+        ),
+        fetch(`https://api.themoviedb.org/3/tv/trending/week?api_key=${TMDB_KEY}`).then((r) =>
+          r.ok ? r.json() : null
+        ),
+        fetch(
+          `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_KEY}&with_origin_country=IN&with_original_language=hi&sort_by=popularity.desc&page=1`
+        ).then((r) => (r.ok ? r.json() : null)),
+        fetch(
+          `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_KEY}&with_genres=16&with_original_language=ja&sort_by=popularity.desc&page=1`
+        ).then((r) => (r.ok ? r.json() : null)),
+      ]);
+
+    const parseList = (res: PromiseSettledResult<any>, forcedType?: 'movie' | 'tv'): MediaItem[] => {
+      if (res.status !== 'fulfilled' || !res.value?.results) return [];
+      const out: MediaItem[] = [];
+      for (const raw of res.value.results) {
+        const m = mapTmdbItemToMedia(raw, forcedType);
+        if (m) out.push(m);
+      }
+      return out;
+    };
+
+    const trendingToday = parseList(trendingRes);
+    const indianMovies = parseList(indianMoviesRes, 'movie');
+    const indianTv = parseList(indianTvRes, 'tv');
+    const newIndianReleases = [...indianMovies.slice(0, 10), ...indianTv.slice(0, 10)];
+    const liveMovies = parseList(moviesRes, 'movie');
+    const liveSeries = parseList(seriesRes, 'tv');
+    const liveSerials = parseList(serialsRes, 'tv').map((s) => ({ ...s, isSerial: true, category: 'serials' as const }));
+    const liveAnime = parseList(animeRes, 'tv');
+
+    return {
+      trendingToday,
+      newIndianReleases,
+      liveMovies,
+      liveSeries,
+      liveSerials,
+      liveAnime,
+    };
+  } catch (err) {
+    console.warn('Live home feeds fallback to curated catalog', err);
+    return {
+      trendingToday: [],
+      newIndianReleases: [],
+      liveMovies: [],
+      liveSeries: [],
+      liveSerials: [],
+      liveAnime: [],
+    };
+  }
+}
+
+/**
+ * Fetches live OTT Platform catalog from TMDB (Netflix, Prime Video, JioHotstar, SonyLIV, ZEE5, Apple TV+)
+ */
+export async function fetchLiveOttCatalog(
+  providerId: string,
+  networkId: string,
+  page = 1
+): Promise<{ movies: MediaItem[]; series: MediaItem[] }> {
+  try {
+    const [moviesByProvider, tvByProvider, tvByNetwork] = await Promise.allSettled([
+      fetch(
+        `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&watch_region=IN&with_watch_providers=${providerId}&sort_by=popularity.desc&page=${page}`
+      ).then((r) => (r.ok ? r.json() : null)),
+      fetch(
+        `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_KEY}&watch_region=IN&with_watch_providers=${providerId}&sort_by=popularity.desc&page=${page}`
+      ).then((r) => (r.ok ? r.json() : null)),
+      fetch(
+        `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_KEY}&with_networks=${networkId}&sort_by=popularity.desc&page=${page}`
+      ).then((r) => (r.ok ? r.json() : null)),
+    ]);
+
+    const movies: MediaItem[] = [];
+    const seriesMap = new Map<string, MediaItem>();
+
+    if (moviesByProvider.status === 'fulfilled' && moviesByProvider.value?.results) {
+      for (const raw of moviesByProvider.value.results) {
+        const m = mapTmdbItemToMedia(raw, 'movie');
+        if (m) movies.push(m);
+      }
+    }
+
+    if (tvByProvider.status === 'fulfilled' && tvByProvider.value?.results) {
+      for (const raw of tvByProvider.value.results) {
+        const s = mapTmdbItemToMedia(raw, 'tv');
+        if (s) seriesMap.set(s.id, s);
+      }
+    }
+
+    if (tvByNetwork.status === 'fulfilled' && tvByNetwork.value?.results) {
+      for (const raw of tvByNetwork.value.results) {
+        const s = mapTmdbItemToMedia(raw, 'tv');
+        if (s && !seriesMap.has(s.id)) seriesMap.set(s.id, s);
+      }
+    }
+
+    return {
+      movies,
+      series: Array.from(seriesMap.values()),
+    };
+  } catch (err) {
+    console.warn('Error fetching live OTT catalog:', err);
+    return { movies: [], series: [] };
+  }
+}
+
+/**
+ * Fetches paginated discover catalog for infinite "Load More" across Movies, Series, Bollywood, TV Serials, and Anime
+ */
+export async function fetchDiscoverCatalog(
+  category: 'movies' | 'series' | 'bollywood' | 'serials' | 'anime',
+  page = 1,
+  filter: 'popular' | 'newest' | 'classic' = 'popular'
+): Promise<MediaItem[]> {
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    let url = '';
+    if (category === 'movies') {
+      const sort =
+        filter === 'newest'
+          ? `primary_release_date.desc&primary_release_date.lte=${today}&vote_count.gte=20`
+          : filter === 'classic'
+          ? 'vote_average.desc&vote_count.gte=1500'
+          : 'popularity.desc';
+      url = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&sort_by=${sort}&page=${page}`;
+    } else if (category === 'series') {
+      const sort =
+        filter === 'newest'
+          ? `first_air_date.desc&first_air_date.lte=${today}&vote_count.gte=10`
+          : filter === 'classic'
+          ? 'vote_average.desc&vote_count.gte=500'
+          : 'popularity.desc';
+      url = `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_KEY}&sort_by=${sort}&page=${page}`;
+    } else if (category === 'bollywood') {
+      const sort =
+        filter === 'newest'
+          ? `primary_release_date.desc&primary_release_date.lte=${today}`
+          : filter === 'classic'
+          ? 'vote_average.desc&vote_count.gte=50'
+          : 'popularity.desc';
+      url = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&with_original_language=hi&sort_by=${sort}&page=${page}`;
+    } else if (category === 'serials') {
+      url = `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_KEY}&with_origin_country=IN&with_original_language=hi&sort_by=popularity.desc&page=${page}`;
+    } else if (category === 'anime') {
+      const sort =
+        filter === 'newest'
+          ? `first_air_date.desc&first_air_date.lte=${today}`
+          : filter === 'classic'
+          ? 'vote_average.desc&vote_count.gte=200'
+          : 'popularity.desc';
+      url = `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_KEY}&with_genres=16&with_original_language=ja&sort_by=${sort}&page=${page}`;
+    }
+
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const forcedType = category === 'movies' || category === 'bollywood' ? 'movie' : 'tv';
+
+    const items: MediaItem[] = [];
+    for (const raw of data.results || []) {
+      const mapped = mapTmdbItemToMedia(raw, forcedType);
+      if (mapped) {
+        if (category === 'serials') {
+          mapped.isSerial = true;
+          mapped.category = 'serials';
+        }
+        items.push(mapped);
+      }
+    }
+    return items;
+  } catch (err) {
+    console.warn('Discover catalog error:', err);
+    return [];
+  }
+}
+
+/**
+ * Resolves playable full-episode streams for Indian TV Serials and hard-to-find shows
+ * via Dailymotion's public CORS API (No API key required, works on Smart TVs, Airtel Xstream Box & Mobile)
+ */
+export async function fetchDirectSerialStreams(
+  title: string,
+  season = 1,
+  episode = 1,
+  isMovie = false
+): Promise<DirectSerialStream[]> {
+  // Clean title for better episode matching
+  let searchTitle = title
+    .replace(/\(.*?\)/g, '')
+    .replace(/Season\s*\d+/gi, '')
+    .trim();
+
+  // For Ali Baba Aur 40 Bhoot, search both popular names so episodes always resolve
+  const isAliBaba =
+    searchTitle.toLowerCase().includes('ali baba') || searchTitle.toLowerCase().includes('40 bhoot');
+
+  const queries = isMovie
+    ? [`${searchTitle} full movie hindi`, `${searchTitle} full movie`]
+    : isAliBaba
+    ? [
+        `Ali Baba Dastaan E Kabul Episode ${episode}`,
+        `Ali Baba Ek Andaaz Andekha Episode ${episode}`,
+        `Ali Baba Episode ${episode} Full Episode`,
+      ]
+    : [
+        `${searchTitle} Episode ${episode} Full Episode`,
+        `${searchTitle} Ep ${episode}`,
+        `${searchTitle} Full Episode`,
+      ];
+
+  try {
+    for (const q of queries) {
+      const encoded = encodeURIComponent(q);
+      const res = await fetch(
+        `https://api.dailymotion.com/videos?search=${encoded}&longer_than=5&limit=8&fields=id,title,duration,thumbnail_url`
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data?.list && Array.isArray(data.list) && data.list.length > 0) {
+        return data.list.map((v: any) => ({
+          id: String(v.id),
+          title: String(v.title || `${title} - Ep ${episode}`),
+          embedUrl: `https://www.dailymotion.com/embed/video/${v.id}?autoplay=1&ui-logo=0&sharing-enable=0`,
+          duration: Number(v.duration || 1200),
+          thumbnail: v.thumbnail_url,
+        }));
+      }
+    }
+  } catch (err) {
+    console.warn('Direct serial stream resolver error:', err);
+  }
+
+  return [];
 }
 
 /**
@@ -346,29 +704,25 @@ const CURATED_SERIES_EPISODES: Record<string, Record<number, Episode[]>> = {
   },
   // Ali Baba Aur 40 Bhoot
   tt21896792: {
-    1: [
-      { season: 1, episode: 1, title: 'The Orphan of Kabul', overview: 'Ali Baba takes care of five orphans in the streets of Kabul.' },
-      { season: 1, episode: 2, title: 'The Forty Ghosts & Thieves', overview: 'Mysterious spirits and thieves spread havoc across the province.' },
-      { season: 1, episode: 3, title: 'The Cave of Wonders', overview: 'Ali Baba discovers the mythical secret cave of treasures.' },
-      { season: 1, episode: 4, title: 'Marjina\'s Quest', overview: 'Princess Marjina seeks refuge from dark evil forces.' },
-      { season: 1, episode: 5, title: 'The Magic Talisman', overview: 'Ali discovers he is the destined hero of Kabul.' },
-      { season: 1, episode: 6, title: 'The Beast Awakens', overview: 'A monstrous threat is unleashed against the city.' },
-      { season: 1, episode: 7, title: 'Battle at the Bazaar', overview: 'Ali Baba defends the Kabul marketplace with his quick wits.' },
-      { season: 1, episode: 8, title: 'The Shadow of Simurgh', overview: 'A legendary mystical creature guides Ali through deadly trials.' },
-    ],
-    2: [
-      { season: 2, episode: 1, title: 'Ek Andaaz Andekha', overview: 'A new chapter begins with darker mystical adversaries and comical spirits.' },
-      { season: 2, episode: 2, title: 'The Magic Flying Carpet', overview: 'Ali takes to the skies to protect the innocent.' },
-      { season: 2, episode: 3, title: 'The Secret of Forty Phantoms', overview: 'Ali Baba uncovers the origin of the 40 phantom spirits.' },
-      { season: 2, episode: 4, title: 'The Final Magic Showdown', overview: 'The grand victory of light, laughter, and courage.' },
-    ],
+    1: Array.from({ length: 40 }, (_, i) => ({
+      season: 1,
+      episode: i + 1,
+      title: `Episode ${i + 1} - Ali Baba Aur 40 Bhoot`,
+      overview: `Ali Baba protects the five orphans of Kabul and battles the mystical forty thieves & spirits (Episode ${i + 1}).`,
+    })),
+    2: Array.from({ length: 40 }, (_, i) => ({
+      season: 2,
+      episode: i + 1,
+      title: `Season 2 Episode ${i + 1}`,
+      overview: `New adventures of Ali Baba in Kabul with magical mysteries and action (Episode ${i + 1}).`,
+    })),
   },
   // Sunflower (ZEE5)
   tt14493392: {
     1: [
       { season: 1, episode: 1, title: 'Murder at Sunflower', overview: 'Mr. Raj Kapoor is found dead in flat 1001, setting off a wild investigation.' },
       { season: 1, episode: 2, title: 'Suspects Galore', overview: 'Inspectors Digendra and Tambe interrogate eccentric residents.' },
-      { season: 1, episode: 3, title: 'Sonu\'s Coconut Oil', overview: 'Sonu Singh behaves so abnormally that he becomes the prime suspect.' },
+      { season: 1, episode: 3, title: "Sonu's Coconut Oil", overview: 'Sonu Singh behaves so abnormally that he becomes the prime suspect.' },
       { season: 1, episode: 4, title: 'The Red Bag', overview: 'A missing bag creates havoc among the neighbors.' },
       { season: 1, episode: 5, title: 'Society Politics', overview: 'The society chairman election interferes with police questioning.' },
       { season: 1, episode: 6, title: 'The Twist', overview: 'A surprising lead reveals hidden connections in the building.' },
@@ -377,8 +731,8 @@ const CURATED_SERIES_EPISODES: Record<string, Record<number, Episode[]>> = {
     ],
     2: [
       { season: 2, episode: 1, title: 'Sonu in Custody', overview: 'Sonu Singh faces interrogation while Rosie enters Sunflower society.' },
-      { season: 2, episode: 2, title: 'Rosie\'s Secret', overview: 'Bar dancer Rosie reveals an unexpected will from Mr. Kapoor.' },
-      { season: 2, episode: 3, title: 'The Maid\'s Testimony', overview: 'Household secrets blow the investigation wide open.' },
+      { season: 2, episode: 2, title: "Rosie's Secret", overview: 'Bar dancer Rosie reveals an unexpected will from Mr. Kapoor.' },
+      { season: 2, episode: 3, title: "The Maid's Testimony", overview: 'Household secrets blow the investigation wide open.' },
       { season: 2, episode: 4, title: 'The Poisonous Cocktail', overview: 'Forensic reports pinpoint the exact toxic concoction.' },
       { season: 2, episode: 5, title: 'Double Game', overview: 'Deceptions and romantic entanglements mislead the police force.' },
       { season: 2, episode: 6, title: 'Sunflower Season Finale', overview: 'The actual culprit is unveiled in an unexpected, hilarious resolution.' },
@@ -387,7 +741,7 @@ const CURATED_SERIES_EPISODES: Record<string, Record<number, Episode[]>> = {
 };
 
 /**
- * Fetches full metadata and episodes list for a series or movie
+ * Fetches full metadata and episodes list for a series, TV serial, or movie
  */
 export async function fetchMediaDetails(
   type: MediaType,
@@ -395,7 +749,6 @@ export async function fetchMediaDetails(
 ): Promise<{ media: MediaItem; episodes: Record<number, Episode[]> }> {
   const normType = type === 'movie' ? 'movie' : 'series';
 
-  // Resolve both TMDB and IMDb ID
   const mappedTmdb = IMDB_TO_TMDB_MAP[imdbId];
   const matchedEpisodes =
     CURATED_SERIES_EPISODES[imdbId] ||
@@ -403,21 +756,29 @@ export async function fetchMediaDetails(
     (imdbId === '101352' ? CURATED_SERIES_EPISODES['tt11912196'] : null) ||
     (imdbId === '84105' ? CURATED_SERIES_EPISODES['tt6473300'] : null) ||
     (imdbId === '290138' ? CURATED_SERIES_EPISODES['tt34907994'] : null) ||
-    (imdbId === '331932' ? CURATED_SERIES_EPISODES['tt21896792'] : null) ||
+    (imdbId === '208744' ? CURATED_SERIES_EPISODES['tt21896792'] : null) ||
     (imdbId === '124151' ? CURATED_SERIES_EPISODES['tt14493392'] : null);
 
-  if (matchedEpisodes) {
-    const local = [
-      ...HERO_FEATURED_ITEMS,
-      ...NEW_2026_RELEASES,
-      ...TRENDING_SERIES,
-      ...BOLLYWOOD_SPECIALS,
-    ].find((m) => m.id === imdbId || m.imdbId === imdbId || m.tmdbId === imdbId);
+  const allLocalItems = [
+    ...HERO_FEATURED_ITEMS,
+    ...NEW_2026_RELEASES,
+    ...TV_SERIALS_COLLECTION,
+    ...ALL_TIME_CLASSICS,
+    ...TRENDING_SERIES,
+    ...TRENDING_MOVIES,
+    ...BOLLYWOOD_SPECIALS,
+    ...ANIME_COLLECTION,
+  ];
 
-    const media: MediaItem = local || {
+  const localMatch = allLocalItems.find(
+    (m) => m.id === imdbId || m.imdbId === imdbId || m.tmdbId === imdbId
+  );
+
+  if (matchedEpisodes) {
+    const media: MediaItem = localMatch || {
       id: imdbId,
       imdbId,
-      title: 'Series',
+      title: imdbId === 'tt21896792' || imdbId === '208744' ? 'Ali Baba Aur 40 Bhoot' : 'Series',
       type: 'tv',
       poster: '',
       year: '2024',
@@ -425,6 +786,27 @@ export async function fetchMediaDetails(
     };
 
     return { media, episodes: matchedEpisodes };
+  }
+
+  // If this is a known Indian TV Serial from TV_SERIALS_COLLECTION, provide rich 50-episode packs per season
+  if (localMatch && isLikelyTvSerial(localMatch)) {
+    const episodesMap: Record<number, Episode[]> = {};
+    const seasons = Math.min(localMatch.totalSeasons || 4, 6);
+    for (let s = 1; s <= seasons; s++) {
+      episodesMap[s] = [];
+      for (let e = 1; e <= 50; e++) {
+        episodesMap[s].push({
+          season: s,
+          episode: e,
+          title: `${localMatch.title} - Episode ${e}`,
+          overview: `Full HD broadcast episode ${e} of ${localMatch.title}.`,
+        });
+      }
+    }
+    return {
+      media: { ...localMatch, isSerial: true },
+      episodes: episodesMap,
+    };
   }
 
   try {
@@ -440,7 +822,7 @@ export async function fetchMediaDetails(
     if (meta.videos && meta.videos.length > 0) {
       for (const v of meta.videos) {
         if (typeof v.season !== 'number' || typeof v.episode !== 'number') continue;
-        if (v.season === 0) continue; // skip specials if preferred
+        if (v.season === 0) continue;
         if (!episodesMap[v.season]) {
           episodesMap[v.season] = [];
         }
@@ -454,7 +836,6 @@ export async function fetchMediaDetails(
         });
       }
 
-      // Sort episodes within each season
       Object.keys(episodesMap).forEach((seasonStr) => {
         const s = Number(seasonStr);
         episodesMap[s].sort((a, b) => a.episode - b.episode);
@@ -462,11 +843,13 @@ export async function fetchMediaDetails(
     }
 
     const seasonsCount = Object.keys(episodesMap).length;
+    const displayName =
+      meta.name === 'Ali Baba: Dastaan-E-Kabul' ? 'Ali Baba Aur 40 Bhoot' : meta.name;
 
     const media: MediaItem = {
       id: meta.id,
       imdbId: meta.id,
-      title: meta.name,
+      title: displayName,
       type: meta.type === 'movie' ? 'movie' : 'tv',
       poster: meta.poster || '',
       backdrop: meta.background || meta.poster || '',
@@ -478,13 +861,27 @@ export async function fetchMediaDetails(
       totalSeasons: seasonsCount || (normType === 'series' ? 1 : undefined),
     };
 
+    if (isLikelyTvSerial(media)) {
+      media.isSerial = true;
+      media.category = 'serials';
+    }
+
+    // If Cinemeta returned no episodes for a TV show/serial, populate 30 episodes so user can switch episodes freely
+    if (media.type === 'tv' && Object.keys(episodesMap).length === 0) {
+      for (let s = 1; s <= (media.totalSeasons || 2); s++) {
+        episodesMap[s] = Array.from({ length: 30 }, (_, idx) => ({
+          season: s,
+          episode: idx + 1,
+          title: `Episode ${idx + 1}`,
+        }));
+      }
+    }
+
     return { media, episodes: episodesMap };
   } catch (err) {
-    // Try fetching live TMDB details if TMDB ID is available
     const numericTmdbId = /^\d+$/.test(imdbId) ? imdbId : IMDB_TO_TMDB_MAP[imdbId];
     if (numericTmdbId) {
       try {
-        const TMDB_KEY = '8265bd1679663a7ea12ac168da84d2e8';
         const tmdbEndpoint = normType === 'movie' ? 'movie' : 'tv';
         const tmdbRes = await fetch(
           `https://api.themoviedb.org/3/${tmdbEndpoint}/${numericTmdbId}?api_key=${TMDB_KEY}&language=en-US`
@@ -494,8 +891,11 @@ export async function fetchMediaDetails(
           const isTv = normType !== 'movie';
           const releaseDate = isTv ? tData.first_air_date : tData.release_date;
           const year = releaseDate ? String(releaseDate).slice(0, 4) : '';
-          const title = isTv ? tData.name : tData.title;
-          const seasonsCount = isTv ? (tData.number_of_seasons || 1) : undefined;
+          let title = isTv ? tData.name : tData.title;
+          if (String(tData.id) === '208744' || (title && title.toLowerCase().includes('dastaan-e-kabul'))) {
+            title = 'Ali Baba Aur 40 Bhoot';
+          }
+          const seasonsCount = isTv ? Math.min(tData.number_of_seasons || 1, 10) : undefined;
 
           const media: MediaItem = {
             id: String(tData.id),
@@ -509,18 +909,26 @@ export async function fetchMediaDetails(
             backdrop: tData.backdrop_path
               ? `https://image.tmdb.org/t/p/w1280${tData.backdrop_path}`
               : undefined,
-            year: year || (tData.status === 'Ended' && releaseDate ? `${year}` : year),
+            year,
             rating: tData.vote_average ? String(tData.vote_average.toFixed(1)) : '8.0',
             overview: tData.overview || '',
             genres: tData.genres?.map((g: { name: string }) => g.name) || [],
             totalSeasons: seasonsCount,
           };
 
+          if (isLikelyTvSerial(media)) {
+            media.isSerial = true;
+            media.category = 'serials';
+          }
+
           const episodesMap: Record<number, Episode[]> = {};
           if (isTv && seasonsCount) {
             for (let s = 1; s <= seasonsCount; s++) {
               episodesMap[s] = [];
-              const epCount = tData.seasons?.find((sn: { season_number: number }) => sn.season_number === s)?.episode_count || 8;
+              const rawEpCount =
+                tData.seasons?.find((sn: { season_number: number }) => sn.season_number === s)
+                  ?.episode_count || 20;
+              const epCount = Math.min(Math.max(rawEpCount, 10), 60);
               for (let e = 1; e <= epCount; e++) {
                 episodesMap[s].push({
                   season: s,
@@ -538,18 +946,7 @@ export async function fetchMediaDetails(
       }
     }
 
-    // Find in local catalog if available
-    const local = [
-      ...HERO_FEATURED_ITEMS,
-      ...NEW_2026_RELEASES,
-      ...ALL_TIME_CLASSICS,
-      ...TRENDING_SERIES,
-      ...TRENDING_MOVIES,
-      ...BOLLYWOOD_SPECIALS,
-      ...ANIME_COLLECTION,
-    ].find((m) => m.id === imdbId || m.imdbId === imdbId || m.tmdbId === imdbId);
-
-    const media: MediaItem = local || {
+    const media: MediaItem = localMatch || {
       id: imdbId,
       imdbId,
       title: `Title (${imdbId})`,
@@ -559,13 +956,12 @@ export async function fetchMediaDetails(
       rating: '',
     };
 
-    // If TV show, generate at least 1-4 seasons with 8-10 episodes each as fallback
     const episodesMap: Record<number, Episode[]> = {};
     if (media.type === 'tv' || normType === 'series') {
-      const seasons = media.totalSeasons || 4;
+      const seasons = Math.min(media.totalSeasons || 3, 5);
       for (let s = 1; s <= seasons; s++) {
         episodesMap[s] = [];
-        for (let e = 1; e <= 8; e++) {
+        for (let e = 1; e <= 25; e++) {
           episodesMap[s].push({
             season: s,
             episode: e,
