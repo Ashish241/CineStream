@@ -37,11 +37,12 @@ export interface StreamServer {
   id: string;
   name: string;
   badge: string;
-  quality: '4K / 1080p' | '1080p HD' | 'Multi-Audio / Hindi' | 'Fast CDN' | 'Backup';
+  quality: string;
   isRecommended?: boolean;
   notes?: string;
-  supportsTmdb: boolean;
-  supportsImdb: boolean;
+  supportsTmdb?: boolean;
+  supportsImdb?: boolean;
+  supportsQualityParam?: boolean;
   buildUrl: (params: {
     type: 'movie' | 'tv';
     id: string; // resolved preferred ID (tmdb or imdb)

@@ -153,8 +153,16 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
 
     const serialCheck = isLikelyTvSerial(media);
     setIsResolvingAutoStream(serialCheck);
+    if (serialCheck) {
+      setUseDirectStream(true);
+    }
 
-    // Pre-fetch direct episode streams in background so serials play automatically & any show has instant fallback
+    // Ensure the player never stays on loading screen for more than 2.6s even if network is slow
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) setIsResolvingAutoStream(false);
+    }, 2600);
+
+    // Pre-fetch direct YouTube HD episode streams so serials/regional shows play automatically & any show has instant fallback
     fetchDirectSerialStreams(media.title, currentSeason, currentEpisode, !isTV)
       .then((streams) => {
         if (cancelled) return;
@@ -162,7 +170,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
         setActiveDirectStreamIndex(0);
         if (serialCheck && streams.length > 0) {
           setUseDirectStream(true);
-        } else {
+        } else if (!serialCheck) {
           setUseDirectStream(false);
         }
       })
@@ -170,17 +178,18 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
         if (!cancelled) setUseDirectStream(false);
       })
       .finally(() => {
+        clearTimeout(safetyTimer);
         if (!cancelled) setIsResolvingAutoStream(false);
       });
 
     return () => {
       cancelled = true;
+      clearTimeout(safetyTimer);
     };
   }, [media.id, media.title, currentSeason, currentEpisode, isTV]);
 
   // Automatic Failover Handler (Triggered when an embed player reports an error or fails to load)
   const triggerAutomaticFailover = (reason?: string) => {
-    // Prevent infinite loops if all sources were already tried
     if (autoRetryCountRef.current >= STREAM_SERVERS.length + resolvedDirectStreams.length) {
       return;
     }
@@ -190,29 +199,30 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     if (useDirectStream) {
       if (activeDirectStreamIndex + 1 < resolvedDirectStreams.length) {
         setActiveDirectStreamIndex((prev) => prev + 1);
-        showToast('Auto-optimizing stream server...');
+        showToast('Auto-optimizing direct HD stream...');
         return;
       }
       setUseDirectStream(false);
       setServerIndex(0);
       setIframeKey((prev) => prev + 1);
-      showToast('Auto-switching to backup HD stream...');
+      showToast('Auto-switching to backup HD server...');
       return;
     }
 
-    // Cycle through STREAM_SERVERS automatically
-    const nextIdx = (serverIndex + 1) % STREAM_SERVERS.length;
-    if (nextIdx === 0 && resolvedDirectStreams.length > 0) {
+    // If primary VidFast/Videasy servers fail and we have verified direct YouTube HD streams ready, switch immediately!
+    if (serverIndex >= 1 && resolvedDirectStreams.length > 0) {
       setUseDirectStream(true);
       setActiveDirectStreamIndex(0);
-      showToast('Auto-connecting to alternate HD stream...');
+      showToast('Auto-connecting to Direct HD Stream...');
       return;
     }
 
+    // Otherwise cycle through STREAM_SERVERS automatically
+    const nextIdx = (serverIndex + 1) % STREAM_SERVERS.length;
     setServerIndex(nextIdx);
     setIframeKey((prev) => prev + 1);
     try {
-      localStorage.setItem(`cinestream_srv_v3_${media.id}`, String(nextIdx));
+      localStorage.setItem(`cinestream_srv_v4_${media.id}`, String(nextIdx));
     } catch {}
     showToast(
       reason
@@ -224,21 +234,59 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
   // Manual 1-click stream source switch (if user ever wants to change source)
   const handleManualSwitchSource = (targetIdx?: number, directFlag?: boolean) => {
     setShowSourceMenu(false);
-    if (directFlag && resolvedDirectStreams.length > 0) {
-      setUseDirectStream(true);
-      const nextMirror = (activeDirectStreamIndex + 1) % resolvedDirectStreams.length;
-      setActiveDirectStreamIndex(targetIdx !== undefined ? targetIdx : nextMirror);
-      showToast('Switched to alternate HD stream');
+
+    // Explicit click from dropdown menu
+    if (directFlag !== undefined) {
+      if (directFlag && resolvedDirectStreams.length > 0) {
+        setUseDirectStream(true);
+        const chosenMirror =
+          targetIdx !== undefined
+            ? targetIdx
+            : (activeDirectStreamIndex + 1) % resolvedDirectStreams.length;
+        setActiveDirectStreamIndex(chosenMirror);
+        showToast(`Switched to Direct HD Stream ${chosenMirror + 1}`);
+        return;
+      }
+      setUseDirectStream(false);
+      const chosenIdx =
+        targetIdx !== undefined ? targetIdx : (serverIndex + 1) % STREAM_SERVERS.length;
+      setServerIndex(chosenIdx);
+      setIframeKey((prev) => prev + 1);
+      try {
+        localStorage.setItem(`cinestream_srv_v4_${media.id}`, String(chosenIdx));
+      } catch {}
+      showToast(`Switched to ${STREAM_SERVERS[chosenIdx].name}`);
       return;
     }
 
-    setUseDirectStream(false);
-    const chosenIdx =
-      targetIdx !== undefined ? targetIdx : (serverIndex + 1) % STREAM_SERVERS.length;
+    // 1-Click "Switch Backup Stream" button: smartly cycles through Direct HD Streams + Multi-CDN Servers
+    if (useDirectStream) {
+      if (activeDirectStreamIndex + 1 < Math.min(resolvedDirectStreams.length, 3)) {
+        const nextMirror = activeDirectStreamIndex + 1;
+        setActiveDirectStreamIndex(nextMirror);
+        showToast(`Switched to Alternate Direct HD Stream ${nextMirror + 1}`);
+        return;
+      }
+      setUseDirectStream(false);
+      setServerIndex(0);
+      setIframeKey((prev) => prev + 1);
+      showToast(`Switched to ${STREAM_SERVERS[0].name}`);
+      return;
+    }
+
+    // If currently on a VidSrc/TMDB server and Direct YouTube HD Stream is available, offer it right after Server 1!
+    if (serverIndex === 0 && resolvedDirectStreams.length > 0) {
+      setUseDirectStream(true);
+      setActiveDirectStreamIndex(0);
+      showToast('Switched to Direct HD Stream (No-Block)');
+      return;
+    }
+
+    const chosenIdx = (serverIndex + 1) % STREAM_SERVERS.length;
     setServerIndex(chosenIdx);
     setIframeKey((prev) => prev + 1);
     try {
-      localStorage.setItem(`cinestream_srv_v3_${media.id}`, String(chosenIdx));
+      localStorage.setItem(`cinestream_srv_v4_${media.id}`, String(chosenIdx));
     } catch {}
     showToast(`Switched to ${STREAM_SERVERS[chosenIdx].name}`);
   };

@@ -27,6 +27,7 @@ import {
   fetchMediaDetails,
   fetchLiveHomeFeeds,
   fetchDiscoverCatalog,
+  getAllVerifiedCuratedItems,
 } from './services/catalogService';
 import { useTvMode, useTvHotkeys, useTvSpatialNavigation } from './hooks/useTvNavigation';
 import { Header } from './components/Header';
@@ -197,7 +198,25 @@ export default function App() {
   const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>(() => {
     try {
       const saved = localStorage.getItem('cinestream_history');
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved) as WatchHistoryItem[];
+      const verifiedCatalog = getAllVerifiedCuratedItems();
+      return parsed.map((entry) => {
+        const mappedId = IMDB_TO_TMDB_MAP[entry.media.id] || entry.media.id;
+        const verifiedMatch = verifiedCatalog.find(
+          (v) =>
+            v.id === mappedId ||
+            v.tmdbId === mappedId ||
+            v.title.toLowerCase() === entry.media.title.toLowerCase()
+        );
+        if (verifiedMatch) {
+          return {
+            ...entry,
+            media: verifiedMatch,
+          };
+        }
+        return entry;
+      });
     } catch {
       return [];
     }
@@ -455,7 +474,7 @@ export default function App() {
         isTvMode ? 'text-base lg:text-lg' : 'text-sm'
       }`}
     >
-      {/* Top Navigation Bar */}
+      {/* Top Navigation Bar with Net77 Style OTT Switcher */}
       <Header
         currentTab={currentTab}
         onSelectTab={(tab) => {
@@ -463,6 +482,12 @@ export default function App() {
           setSearchQuery('');
           setActiveMedia(null);
           setSelectedOtt(null);
+        }}
+        selectedOtt={selectedOtt}
+        onSelectOtt={(ott) => {
+          setSelectedOtt(ott);
+          setSearchQuery('');
+          setActiveMedia(null);
         }}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
