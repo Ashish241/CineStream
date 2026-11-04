@@ -6,6 +6,21 @@ const TMDB_API_KEY = '8265bd1679663a7ea12ac168da84d2e8';
  * Verified mapping of IMDb IDs & legacy IDs to exact verified TMDB numeric IDs.
  */
 export const IMDB_TO_TMDB_MAP: Record<string, string> = {
+  // 2026 & 2025 New Indian OTT Releases (Verified TMDB IDs)
+  'alibaba-40-bhoot': '331932', // Ali Baba Aur 40 Bhoot (2026 JioHotstar Special)
+  tt21896792: '331932',         // Ali Baba Aur 40 Bhoot (2026 JioHotstar Special)
+  '331932': '331932',           // Ali Baba Aur 40 Bhoot (2026)
+  '313172': '313172',           // Chumbak (2026 Netflix / JioHotstar Series)
+  '315887': '315887',           // Vikram On Duty (2026 JioHotstar Series)
+  '243555': '243555',           // Akka (2026 Netflix Series)
+  '331750': '331750',           // The Court (2026 SonyLIV Series)
+  '243206': '243206',           // Pritam and Pedro (2026 JioHotstar Series)
+  '315038': '315038',           // Resort (2026 JioHotstar Series)
+  '339010': '339010',           // Madam Inspector (2026 ZEE5 Series)
+  '337806': '337806',           // Least Eligible Bachelor (2026 Prime Video Series)
+  '255613': '255613',           // Eyes (2026 ZEE5 Series)
+  '323375': '323375',           // Brothers and Sisters (2026 SonyLIV Series)
+
   // Indian Web Series & Blockbusters
   tt12004706: '101352', // Panchayat
   tt11912196: '101352', // Panchayat
