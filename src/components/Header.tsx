@@ -22,6 +22,7 @@ interface HeaderProps {
   onOpenDirectModal: () => void;
   onOpenTvGuide: () => void;
   onOpenVoiceSearch: () => void;
+  onOpenInstallModal: () => void;
   isTvMode: boolean;
   onToggleTvMode: () => void;
   watchlistCount: number;
@@ -37,6 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenDirectModal,
   onOpenTvGuide,
   onOpenVoiceSearch,
+  onOpenInstallModal,
   isTvMode,
   onToggleTvMode,
   watchlistCount,
@@ -49,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'bollywood', label: 'Bollywood' },
     { id: 'anime', label: 'Anime' },
     { id: 'watchlist', label: `My List ${watchlistCount > 0 ? `(${watchlistCount})` : ''}` },
-    { id: 'download', label: 'Get App' },
+    { id: 'download', label: 'Install App' },
   ];
 
   return (
@@ -92,6 +94,9 @@ export const Header: React.FC<HeaderProps> = ({
                   onClick={() => {
                     onSelectOtt(null);
                     onSelectTab(link.id);
+                    if (isDownload) {
+                      onOpenInstallModal();
+                    }
                   }}
                   data-tv-nav="true"
                   className={`tv-focus px-2.5 xl:px-3.5 py-2 text-xs xl:text-sm font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
@@ -110,10 +115,10 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
         </div>
 
-        {/* Zone 3: Search, Voice & Device Actions */}
+        {/* Zone 3: Search, Voice, Install App & Device Actions */}
         <div className="flex items-center gap-1.5 sm:gap-2 flex-1 sm:flex-initial justify-end min-w-0">
           {/* Live Search Bar */}
-          <div className="relative flex-1 sm:flex-initial max-w-[175px] xs:max-w-[210px] sm:max-w-none">
+          <div className="relative flex-1 sm:flex-initial max-w-[140px] xs:max-w-[180px] sm:max-w-none">
             <div className="relative flex items-center w-full">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 sm:left-3 pointer-events-none" />
               <input
@@ -122,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
                 data-tv-nav="true"
-                className="tv-focus w-full sm:w-44 md:w-56 xl:w-64 bg-slate-900 border border-slate-800 text-white text-xs sm:text-sm rounded-xl pl-8 sm:pl-9 pr-7 py-1.5 sm:py-2 focus:border-amber-500 focus:bg-slate-800/90 transition-all placeholder:text-slate-500"
+                className="tv-focus w-full sm:w-40 md:w-52 xl:w-60 bg-slate-900 border border-slate-800 text-white text-xs sm:text-sm rounded-xl pl-8 sm:pl-9 pr-7 py-1.5 sm:py-2 focus:border-amber-500 focus:bg-slate-800/90 transition-all placeholder:text-slate-500"
               />
               {searchQuery && (
                 <button
@@ -265,6 +270,9 @@ export const Header: React.FC<HeaderProps> = ({
                     onClick={() => {
                       onSelectOtt(null);
                       onSelectTab(link.id);
+                      if (isDownload) {
+                        onOpenInstallModal();
+                      }
                     }}
                     data-tv-nav="true"
                     className={`tv-focus px-2.5 py-1 text-[11px] font-semibold rounded-lg whitespace-nowrap shrink-0 transition-colors flex items-center gap-1 ${

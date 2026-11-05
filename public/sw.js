@@ -1,9 +1,14 @@
-const CACHE_NAME = 'cinestream-pwa-v2';
+const CACHE_NAME = 'cinestream-pwa-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icon.svg',
+  '/pwa-192x192.png',
+  '/pwa-512x512.png',
+  '/pwa-maskable-512x512.png',
+  '/apple-touch-icon.png',
+  '/tv-banner-320x180.png',
 ];
 
 self.addEventListener('install', (event) => {

@@ -43,6 +43,8 @@ import { DirectIdModal } from './components/DirectIdModal';
 import { TvGuideModal } from './components/TvGuideModal';
 import { VoiceSearchModal } from './components/VoiceSearchModal';
 import { AppDownloadSection } from './components/AppDownloadSection';
+import { TvSidebarRail } from './components/TvSidebarRail';
+import { InstallAppModal } from './components/InstallAppModal';
 import {
   Clock,
   Bookmark,
@@ -84,6 +86,7 @@ export default function App() {
   const [showDirectModal, setShowDirectModal] = useState<boolean>(false);
   const [showTvGuide, setShowTvGuide] = useState<boolean>(false);
   const [showVoiceSearch, setShowVoiceSearch] = useState<boolean>(false);
+  const [showInstallModal, setShowInstallModal] = useState<boolean>(false);
 
   // Live Auto-Sync Feeds State (Automatically pulls new OTT releases from TMDB)
   const [liveFeeds, setLiveFeeds] = useState<{
@@ -362,7 +365,8 @@ export default function App() {
   // Smart TV / Airtel Xstream Remote hotkeys handler
   useTvHotkeys({
     onBack: () => {
-      if (showVoiceSearch) setShowVoiceSearch(false);
+      if (showInstallModal) setShowInstallModal(false);
+      else if (showVoiceSearch) setShowVoiceSearch(false);
       else if (showDirectModal) setShowDirectModal(false);
       else if (showTvGuide) setShowTvGuide(false);
       else if (activeMedia) setActiveMedia(null);
@@ -470,9 +474,39 @@ export default function App() {
   return (
     <div
       className={`min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden ${
-        isTvMode ? 'text-base lg:text-lg' : 'text-sm'
+        isTvMode ? 'text-base lg:text-lg md:pl-20' : 'text-sm'
       }`}
     >
+      {/* Netflix / Amazon Prime Style Left-Side Smart TV Navigation Rail (Active in TV Mode) */}
+      {isTvMode && !activeMedia && (
+        <TvSidebarRail
+          currentTab={currentTab}
+          onSelectTab={(tab) => {
+            setCurrentTab(tab);
+            setSearchQuery('');
+            setActiveMedia(null);
+            setSelectedOtt(null);
+          }}
+          selectedOtt={selectedOtt}
+          onSelectOtt={(ott) => {
+            setSelectedOtt(ott);
+            setSearchQuery('');
+            setActiveMedia(null);
+          }}
+          onOpenVoiceSearch={() => setShowVoiceSearch(true)}
+          onFocusSearchInput={() => {
+            const input = document.querySelector<HTMLInputElement>('input[type="text"]');
+            if (input) {
+              input.focus();
+              input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }}
+          onOpenTvGuide={() => setShowTvGuide(true)}
+          onExitTvMode={toggleTvMode}
+          watchlistCount={watchlist.length}
+        />
+      )}
+
       {/* Top Navigation Bar with Net77 Style OTT Switcher */}
       <Header
         currentTab={currentTab}
@@ -493,6 +527,7 @@ export default function App() {
         onOpenDirectModal={() => setShowDirectModal(true)}
         onOpenTvGuide={() => setShowTvGuide(true)}
         onOpenVoiceSearch={() => setShowVoiceSearch(true)}
+        onOpenInstallModal={() => setShowInstallModal(true)}
         isTvMode={isTvMode}
         onToggleTvMode={toggleTvMode}
         watchlistCount={watchlist.length}
@@ -977,17 +1012,18 @@ export default function App() {
 
         <button
           onClick={() => {
+            setShowInstallModal(true);
             setCurrentTab('download');
             setSearchQuery('');
             setActiveMedia(null);
             setSelectedOtt(null);
           }}
           className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition-all ${
-            currentTab === 'download' ? 'text-emerald-400' : 'text-slate-400 hover:text-white'
+            currentTab === 'download' ? 'text-emerald-400' : 'text-emerald-400 hover:text-emerald-300'
           }`}
         >
           <Download className="w-5 h-5" />
-          <span className="text-[10px] font-medium mt-0.5">Get App</span>
+          <span className="text-[10px] font-bold mt-0.5">Install App</span>
         </button>
       </nav>
 
@@ -997,23 +1033,19 @@ export default function App() {
         className="hidden md:flex fixed bottom-4 right-4 z-30 items-center gap-2"
       >
         <button
-          onClick={() => {
-            setCurrentTab('download');
-            setActiveMedia(null);
-            setSelectedOtt(null);
-          }}
+          onClick={() => setShowInstallModal(true)}
           data-tv-nav="true"
-          className="tv-focus flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 shadow-xl backdrop-blur-md text-xs font-bold"
-          title="Install TV App (Airtel Xstream Box) & Mobile App"
+          className="tv-focus flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-xl shadow-emerald-500/25 text-xs font-extrabold transition-all"
+          title="Add to Home Screen / Install TV App (Airtel Xstream Box) & Mobile App"
         >
-          <Download className="w-4 h-4" />
-          <span>Get TV / Mobile App</span>
+          <Download className="w-4 h-4 stroke-[2.5]" />
+          <span>Add to Home Screen / Install App</span>
         </button>
 
         <button
           onClick={() => setShowTvGuide(true)}
           data-tv-nav="true"
-          className="tv-focus flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-400 border border-slate-700 shadow-xl backdrop-blur-md text-xs font-semibold"
+          className="tv-focus flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-400 border border-slate-700 shadow-xl backdrop-blur-md text-xs font-semibold"
           title="TV Remote Shortcuts Guide"
         >
           <Tv className="w-4 h-4" />
@@ -1043,6 +1075,14 @@ export default function App() {
           setSelectedOtt(null);
         }}
         isTvMode={isTvMode}
+      />
+
+      {/* Install App / Add to Home Screen Modal */}
+      <InstallAppModal
+        isOpen={showInstallModal}
+        onClose={() => setShowInstallModal(false)}
+        isTvMode={isTvMode}
+        onEnableTvMode={() => setIsTvMode(true)}
       />
     </div>
   );

@@ -3,54 +3,76 @@
   "name": "CineStream TV & Mobile - 1080p OTT & Serials",
   "short_name": "CineStream",
   "description": "Stream Unlimited New & Classic Movies, Web Series, Live OTT Originals, Hindi TV Serials & Anime in 1080p HD. Optimized for Airtel Xstream Box, Smart TV, and Mobile.",
-  "start_url": "/",
+  "start_url": "/?tv=auto",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "fullscreen", "minimal-ui"],
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
   "orientation": "any",
   "background_color": "#020617",
   "theme_color": "#020617",
   "categories": ["entertainment", "video", "movies", "tv"],
   "icons": [
     {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/tv-banner-320x180.png",
+      "sizes": "320x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
-    },
+    }
+  ],
+  "screenshots": [
     {
-      "src": "/icon.svg",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
+      "src": "/tv-banner-320x180.png",
+      "sizes": "320x180",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "CineStream Android TV & Airtel Xstream Home Screen"
     }
   ],
   "shortcuts": [
     {
-      "name": "New Releases",
-      "short_name": "New",
-      "description": "Watch latest movies and web series",
+      "name": "Airtel Xstream TV Mode",
+      "short_name": "TV Mode",
+      "description": "Launch in Full-Screen Smart TV & Airtel Xstream Leanback UI",
+      "url": "/?tv=1",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "New 2026 Releases",
+      "short_name": "New 2026",
+      "description": "Watch latest 2026 OTT movies and web series",
       "url": "/?tab=all",
-      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "TV Serials",
       "short_name": "Serials",
       "description": "Watch Indian TV Serials & Daily Soaps",
       "url": "/?tab=serials",
-      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

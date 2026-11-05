@@ -339,29 +339,84 @@ export const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({
           </div>
         </div>
 
-        {/* Step-by-Step Airtel Xstream Box Installation Guide */}
-        <div className="mt-6 rounded-2xl bg-slate-950/80 border border-slate-800/90 p-5 space-y-3">
-          <div className="flex items-center gap-2 text-amber-400 font-bold text-xs sm:text-sm">
-            <Wifi className="w-4 h-4" />
-            <span>Airtel Xstream Box पे कैसे Install और Run करें (Easy 3-Step Guide):</span>
+        {/* Airtel Xstream Home Screen Icon & Native Android TV APK Setup */}
+        <div className="mt-6 rounded-2xl bg-slate-950/90 border border-amber-500/40 p-5 sm:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-amber-400 font-extrabold text-xs sm:text-sm uppercase tracking-wider">
+                <Wifi className="w-4 h-4" />
+                <span>Airtel Xstream Home Page पे Netflix / Prime जैसा App Icon कैसे लाएं:</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                अपने Airtel Xstream Box की मुख्य होम स्क्रीन (Apps Row) पर <strong>CineStream TV</strong> का आइकॉन लगाने के लिए नीचे दिए गए किसी भी तरीके का उपयोग करें:
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <a
+                href={`https://www.pwabuilder.com/reportcard?site=${encodeURIComponent(tvDirectUrl)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-tv-nav="true"
+                className="tv-focus inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-md"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Build Native Android TV .APK</span>
+              </a>
+
+              <button
+                onClick={() => {
+                  if (!isTvMode) onEnableTvMode();
+                  if (typeof document !== 'undefined' && !document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                  }
+                  setDownloadStatus(
+                    'Netflix / Prime Style Full-Screen TV App Mode Activated! Use Left Arrow for TV Sidebar.'
+                  );
+                }}
+                data-tv-nav="true"
+                className="tv-focus inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-extrabold text-xs"
+              >
+                <Monitor className="w-3.5 h-3.5" />
+                <span>Launch Full-Screen Netflix/Prime TV UI</span>
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-300">
-            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
-              <div className="text-amber-400 font-extrabold">Step 1: Open TV Browser</div>
-              <p className="text-slate-400 leading-relaxed">
-                अपने <strong>Airtel Xstream Box</strong> में Google Play Store से <strong>"TV Bro"</strong>, <strong>"JioPages"</strong> या <strong>"Downloader"</strong> ऐप खोलें।
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs text-slate-300">
+            <div className="p-4 rounded-xl bg-slate-900/95 border border-amber-500/25 space-y-1.5">
+              <div className="text-amber-400 font-extrabold flex items-center justify-between">
+                <span>Method 1: JioPages / TV Bro (सबसे आसान)</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px]">
+                  1-Minute
+                </span>
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                Airtel Xstream Box में <strong>JioPages</strong> या <strong>TV Bro</strong> खोलें → <code className="text-amber-300 font-mono">{tvDirectUrl}</code> खोलें → ऊपर <strong>"Add to Home Screen / Install App"</strong> दबाएं। आइकॉन सीधे TV होम स्क्रीन पर आ जाएगा!
               </p>
             </div>
-            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
-              <div className="text-amber-400 font-extrabold">Step 2: Enter Link or Install</div>
-              <p className="text-slate-400 leading-relaxed">
-                ऊपर दिया गया लिंक <code className="text-amber-300 font-mono">{tvDirectUrl}</code> डालें और <strong>"Install Airtel Xstream TV App"</strong> पर रिमोट से OK दबाएं।
+
+            <div className="p-4 rounded-xl bg-slate-900/95 border border-amber-500/25 space-y-1.5">
+              <div className="text-amber-400 font-extrabold flex items-center justify-between">
+                <span>Method 2: Native .APK File (Apps Row Icon)</span>
+                <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px]">
+                  Netflix Style
+                </span>
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                ऊपर <strong>"Build Native Android TV .APK"</strong> बटन पर क्लिक करके 1 क्लिक में <strong>CineStream.apk</strong> डाउनलोड करें (Android TV Leanback Banner सहित) और Pendrive / <em>Send Files to TV</em> ऐप से Airtel Box में Install कर लें।
               </p>
             </div>
-            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1">
-              <div className="text-amber-400 font-extrabold">Step 3: Use Airtel Remote</div>
-              <p className="text-slate-400 leading-relaxed">
-                ऐप अपने आप <strong>TV Mode</strong> में खुलेगा। रिमोट के <strong>Arrow (D-Pad)</strong> से मूवी चुनें, <strong>OK</strong> से चलाएं, और <strong>CH+ / CH-</strong> से एपिसोड बदलें!
+
+            <div className="p-4 rounded-xl bg-slate-900/95 border border-amber-500/25 space-y-1.5">
+              <div className="text-amber-400 font-extrabold flex items-center justify-between">
+                <span>Method 3: Airtel Remote Button Shortcut</span>
+                <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px]">
+                  1-Button Launch
+                </span>
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                Airtel Box के Play Store से <strong>tvQuickActions</strong> या <strong>Button Mapper</strong> डालें और रिमोट के किसी भी बटन या Home Tile पर <code className="text-amber-300 font-mono">{tvDirectUrl}</code> सेट करें — 1 बटन दबाते ही फुल-स्क्रीन OTT ऐप खुलेगा!
               </p>
             </div>
           </div>
@@ -370,3 +425,4 @@ export const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({
     </section>
   );
 };
+
