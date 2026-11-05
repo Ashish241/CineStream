@@ -222,7 +222,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     setServerIndex(nextIdx);
     setIframeKey((prev) => prev + 1);
     try {
-      localStorage.setItem(`cinestream_srv_v4_${media.id}`, String(nextIdx));
+      localStorage.setItem(`cinestream_srv_v5_${media.id}`, String(nextIdx));
     } catch {}
     showToast(
       reason
@@ -244,7 +244,8 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             ? targetIdx
             : (activeDirectStreamIndex + 1) % resolvedDirectStreams.length;
         setActiveDirectStreamIndex(chosenMirror);
-        showToast(`Switched to Direct HD Stream ${chosenMirror + 1}`);
+        setIframeKey((prev) => prev + 1);
+        showToast(`Switched to Direct HD Episode Server ${chosenMirror + 1}`);
         return;
       }
       setUseDirectStream(false);
@@ -253,17 +254,28 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
       setServerIndex(chosenIdx);
       setIframeKey((prev) => prev + 1);
       try {
-        localStorage.setItem(`cinestream_srv_v4_${media.id}`, String(chosenIdx));
+        localStorage.setItem(`cinestream_srv_v5_${media.id}`, String(chosenIdx));
       } catch {}
       showToast(`Switched to ${STREAM_SERVERS[chosenIdx].name}`);
       return;
     }
 
-    // 1-Click "Switch Backup Stream" button: smartly cycles through Direct HD Streams + Multi-CDN Servers
+    // For TV Serials: cycle through all verified Direct HD Episode Mirrors so serials never hit unsupported western servers
+    if (isSerialMedia && resolvedDirectStreams.length > 0) {
+      setUseDirectStream(true);
+      const nextMirror = (activeDirectStreamIndex + 1) % resolvedDirectStreams.length;
+      setActiveDirectStreamIndex(nextMirror);
+      setIframeKey((prev) => prev + 1);
+      showToast(`Switched to TV Serial HD Server ${nextMirror + 1}`);
+      return;
+    }
+
+    // 1-Click "Switch Backup Stream" button for Movies & Web Series
     if (useDirectStream) {
-      if (activeDirectStreamIndex + 1 < Math.min(resolvedDirectStreams.length, 3)) {
+      if (activeDirectStreamIndex + 1 < Math.min(resolvedDirectStreams.length, 4)) {
         const nextMirror = activeDirectStreamIndex + 1;
         setActiveDirectStreamIndex(nextMirror);
+        setIframeKey((prev) => prev + 1);
         showToast(`Switched to Alternate Direct HD Stream ${nextMirror + 1}`);
         return;
       }
@@ -274,19 +286,11 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
       return;
     }
 
-    // If currently on a VidSrc/TMDB server and Direct YouTube HD Stream is available, offer it right after Server 1!
-    if (serverIndex === 0 && resolvedDirectStreams.length > 0) {
-      setUseDirectStream(true);
-      setActiveDirectStreamIndex(0);
-      showToast('Switched to Direct HD Stream (No-Block)');
-      return;
-    }
-
     const chosenIdx = (serverIndex + 1) % STREAM_SERVERS.length;
     setServerIndex(chosenIdx);
     setIframeKey((prev) => prev + 1);
     try {
-      localStorage.setItem(`cinestream_srv_v4_${media.id}`, String(chosenIdx));
+      localStorage.setItem(`cinestream_srv_v5_${media.id}`, String(chosenIdx));
     } catch {}
     showToast(`Switched to ${STREAM_SERVERS[chosenIdx].name}`);
   };
@@ -771,33 +775,41 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             </button>
 
             {showSourceMenu && (
-              <div className="absolute right-0 top-full mt-2 w-68 bg-slate-900 border border-slate-700/80 rounded-2xl p-2 shadow-2xl z-50 text-left space-y-1">
+              <div className="absolute right-0 top-full mt-2 w-72 max-h-[75vh] overflow-y-auto bg-slate-900 border border-slate-700/80 rounded-2xl p-2 shadow-2xl z-50 text-left space-y-1">
                 <div className="px-3 py-2 border-b border-slate-800">
                   <div className="text-xs font-bold text-white flex items-center justify-between">
-                    <span>Auto Stream Router</span>
+                    <span>Auto Stream Router (TV & ISP Safe)</span>
                     <span className="text-[10px] text-emerald-400 font-semibold">Active</span>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-0.5">
-                    Automatically selects the fastest working server. Tap below only if you wish to switch backup stream:
+                    Top servers use Airtel Xstream & Smart TV safe SSL domains with 1080p Original quality:
                   </p>
                 </div>
 
-                {resolvedDirectStreams.length > 0 && (
-                  <button
-                    onClick={() => handleManualSwitchSource(0, true)}
-                    className={`tv-focus w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors ${
-                      useDirectStream
-                        ? 'bg-amber-500/20 text-white font-bold border border-amber-500/40'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800'
-                    }`}
-                  >
-                    <div>
-                      <div className="text-xs font-bold">Auto Direct HD Stream</div>
-                      <div className="text-[10px] text-slate-400">Fastest direct episode source</div>
-                    </div>
-                    {useDirectStream && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
-                  </button>
-                )}
+                {resolvedDirectStreams.slice(0, 4).map((ds, dIdx) => {
+                  const isCurrentDirect = useDirectStream && activeDirectStreamIndex === dIdx;
+                  return (
+                    <button
+                      key={`direct-${ds.id}-${dIdx}`}
+                      onClick={() => handleManualSwitchSource(dIdx, true)}
+                      className={`tv-focus w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-colors ${
+                        isCurrentDirect
+                          ? 'bg-amber-500/20 text-white font-bold border border-amber-500/40'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="min-w-0 pr-2">
+                        <div className="text-xs font-bold truncate">
+                          Direct HD Episode Server {dIdx + 1} (No-Block)
+                        </div>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {ds.title || 'Instant TV Serial & OTT Stream'}
+                        </div>
+                      </div>
+                      {isCurrentDirect && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
+                    </button>
+                  );
+                })}
 
                 {STREAM_SERVERS.map((srv, idx) => {
                   const isCurrent = !useDirectStream && idx === serverIndex;

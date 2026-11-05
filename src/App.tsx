@@ -28,6 +28,8 @@ import {
   fetchLiveHomeFeeds,
   fetchDiscoverCatalog,
   getAllVerifiedCuratedItems,
+  validateMediaItemWithCache,
+  validateAndCrossReferenceCatalog,
 } from './services/catalogService';
 import { useTvMode, useTvHotkeys, useTvSpatialNavigation } from './hooks/useTvNavigation';
 import { Header } from './components/Header';
@@ -299,9 +301,10 @@ export default function App() {
     return () => clearTimeout(timeout);
   }, [searchQuery]);
 
-  // Launch stream handler with automatic TMDB/IMDb resolution
+  // Launch stream handler with automatic TMDB/IMDb resolution & cache cross-reference validation
   const handlePlayMedia = async (media: MediaItem, season = 1, episode = 1) => {
-    const enrichedMedia: MediaItem = { ...media };
+    const validatedSelection = validateMediaItemWithCache(media) || media;
+    const enrichedMedia: MediaItem = { ...validatedSelection };
     if (!enrichedMedia.tmdbId && IMDB_TO_TMDB_MAP[enrichedMedia.id]) {
       enrichedMedia.tmdbId = IMDB_TO_TMDB_MAP[enrichedMedia.id];
     }
@@ -315,14 +318,15 @@ export default function App() {
         enrichedMedia.tmdbId = resolved;
       }
     }
-    setActiveMedia(enrichedMedia);
+    const finalMedia = validateMediaItemWithCache(enrichedMedia) || enrichedMedia;
+    setActiveMedia(finalMedia);
     setCurrentSeason(season);
     setCurrentEpisode(episode);
-    recordWatchHistory(enrichedMedia, season, episode, currentServer.id);
+    recordWatchHistory(finalMedia, season, episode, currentServer.id);
 
-    if (media.type === 'tv' || media.type === 'series' || media.isSerial) {
+    if (finalMedia.type === 'tv' || finalMedia.type === 'series' || finalMedia.isSerial) {
       try {
-        const details = await fetchMediaDetails(media.type, media.imdbId || media.id);
+        const details = await fetchMediaDetails(finalMedia.type, finalMedia.imdbId || finalMedia.id);
         if (details.episodes && Object.keys(details.episodes).length > 0) {
           setEpisodesMap(details.episodes);
         }
@@ -416,14 +420,9 @@ export default function App() {
     );
   }, [watchlist, allCurated]);
 
-  // Combined rows with deduplication
+  // Combined rows with deduplication & cache cross-reference validation
   const mergeUnique = (primary: MediaItem[], secondary: MediaItem[]) => {
-    const map = new Map<string, MediaItem>();
-    primary.forEach((i) => map.set(i.id, i));
-    secondary.forEach((i) => {
-      if (!map.has(i.id)) map.set(i.id, i);
-    });
-    return Array.from(map.values());
+    return validateAndCrossReferenceCatalog([...primary, ...secondary]);
   };
 
   const combinedSerials = useMemo(
