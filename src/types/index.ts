@@ -51,6 +51,9 @@ export interface StreamServer {
     season?: number;
     episode?: number;
     quality?: VideoQuality;
+    startAt?: number;
+    autoPlay?: boolean;
+    muted?: boolean;
   }) => string;
 }
 

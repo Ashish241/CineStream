@@ -1024,7 +1024,11 @@ const VERIFIED_YOUTUBE_FALLBACKS: Array<{
 ];
 
 function buildYouTubeEmbedUrl(videoId: string): string {
-  return `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&enablejsapi=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1`;
+  const originParam =
+    typeof window !== 'undefined' && window.location?.origin
+      ? `&origin=${encodeURIComponent(window.location.origin)}`
+      : '';
+  return `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&disablekb=1&fs=0&enablejsapi=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1${originParam}`;
 }
 
 // Channels whose YouTube uploads disable 3rd-party iframe embedding (UNPLAYABLE_IN_EMBED)

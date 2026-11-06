@@ -192,29 +192,14 @@ function resolveTmdbId(params: { id: string; imdbId?: string; tmdbId?: string })
 
 /**
  * Verified Working High-Availability Multi-CDN Streaming Servers (2025-2026)
- * Top 5 servers use clean Cloudflare SSL domains (.net, .pro, .co, .win) that are 100% safe on
- * Airtel Xstream Box, Jio Set-Top Box, and Smart TVs (never triggering ISP "Your connection is not private" SSL blocks)
- * while delivering the full VidSrc/Multi-CDN catalog in Original 1080p/4K quality.
+ * Removed old Server 1 (videasy-net) and Server 8 as requested.
+ * All servers support startAt timestamp seeking, autoplay, and custom player synchronization.
  */
 export const STREAM_SERVERS: StreamServer[] = [
   {
-    id: 'videasy-net',
-    name: 'Server 1: Videasy 1080p Original (TV & Airtel Safe)',
-    badge: '1080p Original (TV Safe)',
-    quality: '1080p Original HD',
-    supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
-      const targetId = resolveTmdbId({ id, imdbId, tmdbId });
-      if (type === 'movie') {
-        return `https://player.videasy.net/movie/${targetId}?autoPlay=true&color=f59e0b`;
-      }
-      return `https://player.videasy.net/tv/${targetId}/${season}/${episode}?autoPlay=true&color=f59e0b&nextEpisode=true&episodeSelector=true`;
-    },
-  },
-  {
     id: 'vidlink-pro',
-    name: 'Server 2: VidLink Pro 4K/1080p (Max Catalog · TV Safe)',
-    badge: 'VidLink 4K/1080p (TV Safe)',
+    name: 'Server 1: VidLink Pro 4K/1080p (Max Catalog · TV Safe)',
+    badge: 'VidLink 4K/1080p',
     quality: '4K / 1080p Original',
     supportsQualityParam: true,
     buildUrl: ({
@@ -225,83 +210,139 @@ export const STREAM_SERVERS: StreamServer[] = [
       season = 1,
       episode = 1,
       quality = '1080p',
+      startAt = 0,
+      autoPlay = true,
+      muted = false,
     }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
       const qParam = quality && quality !== 'auto' ? `&quality=${quality}` : '';
+      const startParam = startAt > 0 ? `&startAt=${Math.floor(startAt)}` : '';
+      const autoParam = `&autoplay=${autoPlay ? 'true' : 'false'}`;
+      const muteParam = muted ? '&muted=true' : '';
       if (type === 'movie') {
-        return `https://vidlink.pro/movie/${targetId}?primaryColor=f59e0b&autoplay=true&title=false&poster=false${qParam}`;
+        return `https://vidlink.pro/movie/${targetId}?primaryColor=f59e0b&title=false&poster=false${autoParam}${qParam}${startParam}${muteParam}`;
       }
-      return `https://vidlink.pro/tv/${targetId}/${season}/${episode}?primaryColor=f59e0b&autoplay=true&title=false&poster=false${qParam}`;
+      return `https://vidlink.pro/tv/${targetId}/${season}/${episode}?primaryColor=f59e0b&title=false&poster=false${autoParam}${qParam}${startParam}${muteParam}`;
     },
   },
   {
     id: 'autoembed-co',
-    name: 'Server 3: AutoEmbed Hindi & Original Multi-CDN (TV Safe)',
-    badge: 'AutoEmbed Multi-CDN (TV Safe)',
+    name: 'Server 2: AutoEmbed Hindi & Original Multi-CDN (TV Safe)',
+    badge: 'AutoEmbed Multi-CDN',
     quality: '1080p Multi-Audio',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({
+      type,
+      id,
+      imdbId,
+      tmdbId,
+      season = 1,
+      episode = 1,
+      startAt = 0,
+      autoPlay = true,
+    }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `?startAt=${Math.floor(startAt)}&t=${Math.floor(startAt)}&autoplay=${autoPlay ? 1 : 0}` : `?autoplay=${autoPlay ? 1 : 0}`;
       if (type === 'movie') {
-        return `https://autoembed.co/movie/tmdb/${targetId}`;
+        return `https://autoembed.co/movie/tmdb/${targetId}${startParam}`;
       }
-      return `https://autoembed.co/tv/tmdb/${targetId}-${season}-${episode}`;
+      return `https://autoembed.co/tv/tmdb/${targetId}-${season}-${episode}${startParam}`;
     },
   },
   {
     id: 'vidfast-pro',
-    name: 'Server 4: VidFast Pro Multi-Audio HD (TV Safe)',
-    badge: 'VidFast HD (TV Safe)',
+    name: 'Server 3: VidFast Pro Multi-Audio HD (TV Safe)',
+    badge: 'VidFast HD',
     quality: '1080p Full HD',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({
+      type,
+      id,
+      imdbId,
+      tmdbId,
+      season = 1,
+      episode = 1,
+      startAt = 0,
+      autoPlay = true,
+      muted = false,
+    }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `&startAt=${Math.floor(startAt)}` : '';
+      const autoParam = `autoPlay=${autoPlay ? 'true' : 'false'}`;
+      const muteParam = muted ? '&muted=true' : '';
       if (type === 'movie') {
-        return `https://vidfast.pro/movie/${targetId}?autoPlay=true&theme=f59e0b&title=false&poster=false`;
+        return `https://vidfast.pro/movie/${targetId}?${autoParam}&theme=f59e0b&title=false&poster=false${startParam}${muteParam}`;
       }
-      return `https://vidfast.pro/tv/${targetId}/${season}/${episode}?autoPlay=true&theme=f59e0b&title=false&poster=false`;
+      return `https://vidfast.pro/tv/${targetId}/${season}/${episode}?${autoParam}&theme=f59e0b&title=false&poster=false${startParam}${muteParam}`;
     },
   },
   {
     id: 'nontongo-win',
-    name: 'Server 5: NontonGo VidSrc Proxy (Airtel SSL Bypass)',
-    badge: 'VidSrc Proxy (TV Safe)',
+    name: 'Server 4: NontonGo VidSrc Proxy (Airtel SSL Bypass)',
+    badge: 'VidSrc Proxy',
     quality: '1080p Full HD',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({
+      type,
+      id,
+      imdbId,
+      tmdbId,
+      season = 1,
+      episode = 1,
+      startAt = 0,
+    }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `?startAt=${Math.floor(startAt)}&t=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://www.nontongo.win/embed/movie/${targetId}`;
+        return `https://www.nontongo.win/embed/movie/${targetId}${startParam}`;
       }
-      return `https://www.nontongo.win/embed/tv/${targetId}/${season}/${episode}`;
+      return `https://www.nontongo.win/embed/tv/${targetId}/${season}/${episode}${startParam}`;
     },
   },
   {
     id: 'vidsrc-wtf-1',
-    name: 'Server 6: VidSrc Multi-Server API 1 (Private DNS)',
+    name: 'Server 5: VidSrc Multi-Server API 1 (Private DNS)',
     badge: 'VidSrc API 1',
     quality: '1080p HD',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({
+      type,
+      id,
+      imdbId,
+      tmdbId,
+      season = 1,
+      episode = 1,
+      startAt = 0,
+    }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `&startAt=${Math.floor(startAt)}&t=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://vidsrc.wtf/api/1/movie/?id=${targetId}&color=f59e0b`;
+        return `https://vidsrc.wtf/api/1/movie/?id=${targetId}&color=f59e0b${startParam}`;
       }
-      return `https://vidsrc.wtf/api/1/tv/?id=${targetId}&s=${season}&e=${episode}&color=f59e0b`;
+      return `https://vidsrc.wtf/api/1/tv/?id=${targetId}&s=${season}&e=${episode}&color=f59e0b${startParam}`;
     },
   },
   {
     id: 'vidsrc-wtf-2',
-    name: 'Server 7: VidSrc Multi-Audio API 2 (Private DNS)',
+    name: 'Server 6: VidSrc Multi-Audio API 2 (Private DNS)',
     badge: 'VidSrc API 2',
     quality: '1080p Multi-Audio',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({
+      type,
+      id,
+      imdbId,
+      tmdbId,
+      season = 1,
+      episode = 1,
+      startAt = 0,
+    }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `&startAt=${Math.floor(startAt)}&t=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://vidsrc.wtf/api/2/movie/?id=${targetId}&color=f59e0b`;
+        return `https://vidsrc.wtf/api/2/movie/?id=${targetId}&color=f59e0b${startParam}`;
       }
-      return `https://vidsrc.wtf/api/2/tv/?id=${targetId}&s=${season}&e=${episode}&color=f59e0b`;
+      return `https://vidsrc.wtf/api/2/tv/?id=${targetId}&s=${season}&e=${episode}&color=f59e0b${startParam}`;
     },
   },
 ];
@@ -310,11 +351,11 @@ export const DEFAULT_SERVER = STREAM_SERVERS[0];
 
 /**
  * Selects the optimal primary server index for any media item automatically.
- * Uses v5 storage key so any previously cached ISP-blocked server is cleared.
+ * Uses v6 storage key so any previously cached server index is cleanly updated.
  */
 export function getPreferredServerIndexForMedia(media: MediaItem): number {
   try {
-    const savedIdx = localStorage.getItem(`cinestream_srv_v5_${media.id}`);
+    const savedIdx = localStorage.getItem(`cinestream_srv_v6_${media.id}`);
     if (savedIdx !== null) {
       const parsed = Number(savedIdx);
       if (!Number.isNaN(parsed) && parsed >= 0 && parsed < STREAM_SERVERS.length) {

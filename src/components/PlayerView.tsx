@@ -27,6 +27,7 @@ import {
   Star,
   Film,
   Tv,
+  MousePointerClick,
 } from 'lucide-react';
 import { Episode, MediaItem, StreamServer, VideoQuality } from '../types';
 import {
@@ -124,20 +125,25 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
   const [showControlsOverlay, setShowControlsOverlay] = useState(true);
   const [isControlsLocked, setIsControlsLocked] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSeekingOnServer, setIsSeekingOnServer] = useState(false);
+  const [allowEmbedPassthrough, setAllowEmbedPassthrough] = useState(false);
 
   // Unified CineStream Native Video Player Playback State
   const [isPlaying, setIsPlaying] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState<number>(isTV ? 2580 : 8100); // 43m default for TV, 2h15m for Movie
+  const [streamStartAt, setStreamStartAt] = useState(0);
+  const [duration, setDuration] = useState<number>(isTV ? 2580 : 8100);
   const [volume, setVolume] = useState<number>(100);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [aspectFit, setAspectFit] = useState<AspectFitMode>('fit');
-  const [selectedAudioTrack, setSelectedAudioTrack] = useState<string>('Hindi / Original (Dual Audio)');
+  const [selectedAudioTrack, setSelectedAudioTrack] = useState<string>(
+    'Hindi / Original (Dual Audio)'
+  );
   const [selectedSubtitle, setSelectedSubtitle] = useState<string>('Off');
   const [seekFeedback, setSeekFeedback] = useState<'forward' | 'backward' | null>(null);
 
-  // Server & Stream Routing State
+  // Server & Stream Routing State (6 clean servers: Server 1 and Server 8 removed as requested)
   const [serverIndex, setServerIndex] = useState<number>(() =>
     getPreferredServerIndexForMedia(media)
   );
@@ -182,9 +188,17 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const serverSeekCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handshakeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastManualSeekAtRef = useRef<number>(0);
+  const currentTimeRef = useRef<number>(0);
   const autoRetryCountRef = useRef<number>(0);
 
-  const showToast = useCallback((msg: string, durationMs = 3000) => {
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  const showToast = useCallback((msg: string, durationMs = 2600) => {
     setToastMessage(msg);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => {
@@ -199,27 +213,105 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     setShowAudioMenu(false);
   }, []);
 
-  // Bridge to send commands to the active stream inside CineStream's unified video player
+  // Handshake with embedded player on load so YouTube IFrame JS API & Playerjs obey our custom controls
+  const registerIframePlayerHandshake = useCallback(() => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    try {
+      // YouTube IFrame API listening handshake (required for playVideo/pauseVideo/seekTo/infoDelivery)
+      win.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*');
+      win.postMessage(
+        JSON.stringify({
+          event: 'command',
+          func: 'addEventListener',
+          args: ['onStateChange'],
+          id: 1,
+          channel: 'widget',
+        }),
+        '*'
+      );
+      win.postMessage(
+        JSON.stringify({
+          event: 'command',
+          func: 'addEventListener',
+          args: ['onReady'],
+          id: 1,
+          channel: 'widget',
+        }),
+        '*'
+      );
+      win.postMessage(
+        JSON.stringify({
+          event: 'command',
+          func: 'addEventListener',
+          args: ['onError'],
+          id: 1,
+          channel: 'widget',
+        }),
+        '*'
+      );
+    } catch {
+      // ignore cross-origin restrictions
+    }
+  }, []);
+
+  const handleIframeLoad = useCallback(() => {
+    setIsSeekingOnServer(false);
+    registerIframePlayerHandshake();
+    if (handshakeIntervalRef.current) clearInterval(handshakeIntervalRef.current);
+    let count = 0;
+    handshakeIntervalRef.current = setInterval(() => {
+      count += 1;
+      registerIframePlayerHandshake();
+      if (count >= 8 && handshakeIntervalRef.current) {
+        clearInterval(handshakeIntervalRef.current);
+      }
+    }, 500);
+  }, [registerIframePlayerHandshake]);
+
+  useEffect(() => {
+    return () => {
+      if (handshakeIntervalRef.current) clearInterval(handshakeIntervalRef.current);
+      if (serverSeekCommitTimerRef.current) clearTimeout(serverSeekCommitTimerRef.current);
+    };
+  }, []);
+
+  // Bridge to send real-time commands to the active stream inside CineStream's unified video player
   const sendPlayerCommand = useCallback(
     (action: 'play' | 'pause' | 'seek' | 'volume' | 'mute' | 'unmute' | 'speed', value?: number) => {
       const win = iframeRef.current?.contentWindow;
       if (!win) return;
 
       try {
-        // 1. YouTube IFrame JS API commands
+        // Ensure listening handshake is active
+        win.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*');
+
         if (action === 'play') {
-          win.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
-          win.postMessage(JSON.stringify({ action: 'play', command: 'play', api: 'play' }), '*');
-        } else if (action === 'pause') {
-          win.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
-          win.postMessage(JSON.stringify({ action: 'pause', command: 'pause', api: 'pause' }), '*');
-        } else if (action === 'seek' && typeof value === 'number') {
           win.postMessage(
-            JSON.stringify({ event: 'command', func: 'seekTo', args: [Math.floor(value), true] }),
+            JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
+            '*'
+          );
+          win.postMessage(JSON.stringify({ api: 'play', action: 'play', command: 'play', method: 'play' }), '*');
+          win.postMessage({ api: 'play', action: 'play', command: 'play', method: 'play' }, '*');
+        } else if (action === 'pause') {
+          win.postMessage(
+            JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
+            '*'
+          );
+          win.postMessage(JSON.stringify({ api: 'pause', action: 'pause', command: 'pause', method: 'pause' }), '*');
+          win.postMessage({ api: 'pause', action: 'pause', command: 'pause', method: 'pause' }, '*');
+        } else if (action === 'seek' && typeof value === 'number') {
+          const targetSec = Math.max(0, Math.floor(value));
+          win.postMessage(
+            JSON.stringify({ event: 'command', func: 'seekTo', args: [targetSec, true] }),
             '*'
           );
           win.postMessage(
-            JSON.stringify({ action: 'seek', command: 'seek', api: 'seek', time: Math.floor(value), set: Math.floor(value) }),
+            JSON.stringify({ api: 'seek', action: 'seek', command: 'seek', set: targetSec, time: targetSec }),
+            '*'
+          );
+          win.postMessage(
+            { api: 'seek', action: 'seek', command: 'seek', set: targetSec, time: targetSec },
             '*'
           );
         } else if (action === 'volume' && typeof value === 'number') {
@@ -228,27 +320,58 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             '*'
           );
           win.postMessage(
-            JSON.stringify({ action: 'volume', api: 'volume', value: value / 100, set: value / 100 }),
+            JSON.stringify({ api: 'volume', action: 'volume', set: value / 100, value: value / 100 }),
             '*'
           );
         } else if (action === 'mute') {
           win.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
-          win.postMessage(JSON.stringify({ action: 'mute', api: 'mute' }), '*');
+          win.postMessage(JSON.stringify({ api: 'mute', action: 'mute' }), '*');
         } else if (action === 'unmute') {
           win.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
-          win.postMessage(JSON.stringify({ action: 'unmute', api: 'unmute' }), '*');
+          win.postMessage(JSON.stringify({ api: 'unmute', action: 'unmute' }), '*');
         } else if (action === 'speed' && typeof value === 'number') {
           win.postMessage(
             JSON.stringify({ event: 'command', func: 'setPlaybackRate', args: [value] }),
             '*'
           );
-          win.postMessage(JSON.stringify({ action: 'speed', speed: value, rate: value }), '*');
+          win.postMessage(JSON.stringify({ api: 'speed', action: 'speed', set: value, rate: value }), '*');
         }
       } catch {
         // Ignore cross-origin postMessage restrictions
       }
     },
     []
+  );
+
+  // Commits a timestamp seek to multi-CDN servers (VidLink Pro, AutoEmbed, VidFast Pro, NontonGo, VidSrc)
+  // via ?startAt=<seconds> so the video on the server ACTUALLY jumps to the exact position
+  const commitServerSeek = useCallback(
+    (targetSec: number) => {
+      const clamped = Math.max(0, Math.floor(targetSec));
+      lastManualSeekAtRef.current = Date.now();
+      sendPlayerCommand('seek', clamped);
+
+      if (useDirectStream) {
+        // Chromeless JS API stream seeks instantaneously in-place via postMessage('seekTo')
+        if (!isPlaying) {
+          setIsPlaying(true);
+          sendPlayerCommand('play');
+        }
+        return;
+      }
+
+      // For multi-CDN embed servers, debounce rapid clicks (+10s, +10s) by 320ms and redirect stream to ?startAt=clamped
+      if (serverSeekCommitTimerRef.current) {
+        clearTimeout(serverSeekCommitTimerRef.current);
+      }
+      setIsSeekingOnServer(true);
+      serverSeekCommitTimerRef.current = setTimeout(() => {
+        setStreamStartAt(clamped);
+        setIsPlaying(true);
+        setIframeKey((prev) => prev + 1);
+      }, 320);
+    },
+    [useDirectStream, isPlaying, sendPlayerCommand]
   );
 
   // Close dropdown menus ONLY when clicking outside on phone/laptop or pressing Back/Escape on remote
@@ -292,7 +415,9 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     setCountdown(null);
     autoRetryCountRef.current = 0;
     setCurrentTime(0);
+    setStreamStartAt(0);
     setIsPlaying(true);
+    setIsSeekingOnServer(false);
     setDuration(isTV ? 2580 : 8100);
 
     const preferredIdx = getPreferredServerIndexForMedia(media);
@@ -336,10 +461,12 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     };
   }, [media.id, media.title, currentSeason, currentEpisode, isTV]);
 
-  // Synchronized timeline clock for CineStream Custom Player UI
+  // Fallback progression clock when playing on servers that don't emit sub-second timeupdate events
   useEffect(() => {
-    if (!isPlaying || isResolvingAutoStream) return;
+    if (!isPlaying || isResolvingAutoStream || isSeekingOnServer) return;
     const interval = setInterval(() => {
+      // Do not overwrite if a live PLAYER_EVENT or manual seek just updated currentTime
+      if (Date.now() - lastManualSeekAtRef.current < 1200) return;
       setCurrentTime((prev) => {
         if (prev + playbackSpeed >= duration) {
           return duration;
@@ -348,7 +475,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isPlaying, isResolvingAutoStream, duration, playbackSpeed]);
+  }, [isPlaying, isResolvingAutoStream, isSeekingOnServer, duration, playbackSpeed]);
 
   // Automatic Failover Handler
   const triggerAutomaticFailover = (reason?: string) => {
@@ -360,7 +487,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     if (useDirectStream) {
       if (activeDirectStreamIndex + 1 < resolvedDirectStreams.length) {
         setActiveDirectStreamIndex((prev) => prev + 1);
-        showToast('Auto-optimizing direct HD stream...');
+        showToast('Auto-optimizing stream in CineStream Player...');
         return;
       }
       setUseDirectStream(false);
@@ -370,103 +497,115 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
       return;
     }
 
-    if (serverIndex >= 1 && resolvedDirectStreams.length > 0) {
-      setUseDirectStream(true);
-      setActiveDirectStreamIndex(0);
-      showToast('Auto-connecting to Direct HD Stream...');
-      return;
-    }
-
     const nextIdx = (serverIndex + 1) % STREAM_SERVERS.length;
     setServerIndex(nextIdx);
     setIframeKey((prev) => prev + 1);
     try {
-      localStorage.setItem(`cinestream_srv_v5_${media.id}`, String(nextIdx));
+      localStorage.setItem(`cinestream_srv_v6_${media.id}`, String(nextIdx));
     } catch {}
     showToast(
       reason
-        ? `${reason} — Auto-switching to ${STREAM_SERVERS[nextIdx].badge}...`
-        : `Switched to ${STREAM_SERVERS[nextIdx].badge}`
+        ? `${reason} — Auto-switching to Server ${nextIdx + 1} (${STREAM_SERVERS[nextIdx].badge})...`
+        : `Switched to Server ${nextIdx + 1}: ${STREAM_SERVERS[nextIdx].badge}`
     );
   };
 
-  // Manual Server Switch Handler (Plays immediately inside CineStream Player on the same screen)
-  const handleManualSwitchSource = (targetIdx?: number, directFlag?: boolean) => {
+  // Manual Server Switch Handler (Plays immediately inside CineStream Player on the same screen, preserving timestamp)
+  const handleManualSwitchSource = (targetIdx: number) => {
     closeAllMenus();
+    const chosenIdx = ((targetIdx % STREAM_SERVERS.length) + STREAM_SERVERS.length) % STREAM_SERVERS.length;
+    setServerIndex(chosenIdx);
+    // Preserve current playback position when switching servers so user continues where they left off
+    setStreamStartAt(currentTimeRef.current > 10 ? Math.floor(currentTimeRef.current) : 0);
     setIsPlaying(true);
 
-    if (directFlag !== undefined) {
-      if (directFlag && resolvedDirectStreams.length > 0) {
-        setUseDirectStream(true);
-        const chosenMirror =
-          targetIdx !== undefined
-            ? targetIdx
-            : (activeDirectStreamIndex + 1) % resolvedDirectStreams.length;
-        setActiveDirectStreamIndex(chosenMirror);
-        if (resolvedDirectStreams[chosenMirror]?.duration) {
-          setDuration(resolvedDirectStreams[chosenMirror].duration!);
-        }
-        setIframeKey((prev) => prev + 1);
-        showToast('Playing on CineStream Player · Direct HD Server');
-        return;
+    // If this is an Indian TV Serial with verified direct streams, rotate mirrors cleanly across servers
+    if (isSerialMedia && resolvedDirectStreams.length > 0) {
+      setUseDirectStream(true);
+      const mirrorIdx = chosenIdx % resolvedDirectStreams.length;
+      setActiveDirectStreamIndex(mirrorIdx);
+      if (resolvedDirectStreams[mirrorIdx]?.duration) {
+        setDuration(resolvedDirectStreams[mirrorIdx].duration);
       }
-
+    } else {
       setUseDirectStream(false);
-      const chosenIdx =
-        targetIdx !== undefined ? targetIdx : (serverIndex + 1) % STREAM_SERVERS.length;
-      setServerIndex(chosenIdx);
-      setIframeKey((prev) => prev + 1);
-      try {
-        localStorage.setItem(`cinestream_srv_v5_${media.id}`, String(chosenIdx));
-      } catch {}
-      showToast(`Playing on CineStream Player · ${STREAM_SERVERS[chosenIdx].badge}`);
-      return;
     }
 
-    const chosenIdx = (serverIndex + 1) % STREAM_SERVERS.length;
-    setUseDirectStream(false);
-    setServerIndex(chosenIdx);
     setIframeKey((prev) => prev + 1);
     try {
-      localStorage.setItem(`cinestream_srv_v5_${media.id}`, String(chosenIdx));
+      localStorage.setItem(`cinestream_srv_v6_${media.id}`, String(chosenIdx));
     } catch {}
-    showToast(`Playing on CineStream Player · ${STREAM_SERVERS[chosenIdx].badge}`);
+    showToast(`Playing on CineStream Player · Server ${chosenIdx + 1} (${STREAM_SERVERS[chosenIdx].badge})`);
   };
 
-  // Custom Player Controls: Play/Pause, -10s Backward, +10s Forward, Seek, Volume, Speed
+  // Custom Player Controls: Play/Pause, -10s Backward, +10s Forward, Seekbar, Volume, Speed
+  // Guaranteed to ACTUALLY pause, resume, and seek the underlying video on ALL servers!
   const handleTogglePlayPause = () => {
     setIsPlaying((prev) => {
       const next = !prev;
-      sendPlayerCommand(next ? 'play' : 'pause');
-      showToast(next ? '▶ Playing' : '⏸ Paused', 1400);
+      if (useDirectStream) {
+        // Chromeless JS API stream pauses/resumes natively in-place
+        sendPlayerCommand(next ? 'play' : 'pause');
+      } else {
+        if (!next) {
+          // Pausing on multi-CDN server: save exact timestamp and suspend embed playback so audio/video stops 100% immediately
+          const pausedSec = Math.max(0, Math.floor(currentTimeRef.current));
+          setStreamStartAt(pausedSec);
+          sendPlayerCommand('pause');
+        } else {
+          // Resuming on multi-CDN server: resume from exact saved timestamp (?startAt=pausedSec&autoPlay=true)
+          const resumeSec = Math.max(0, Math.floor(currentTimeRef.current));
+          setStreamStartAt(resumeSec);
+          sendPlayerCommand('play');
+        }
+      }
+      showToast(
+        next
+          ? `▶ Playing from ${formatTime(currentTimeRef.current)}`
+          : `⏸ Paused at ${formatTime(currentTimeRef.current)}`,
+        1500
+      );
       return next;
     });
   };
 
   const handleSeekByOffset = (deltaSeconds: number) => {
-    setCurrentTime((prev) => {
-      const nextTime = Math.max(0, Math.min(duration, prev + deltaSeconds));
-      sendPlayerCommand('seek', nextTime);
-      return nextTime;
-    });
+    const baseTime = currentTimeRef.current;
+    const nextTime = Math.max(0, Math.min(duration, baseTime + deltaSeconds));
+    currentTimeRef.current = nextTime;
+    setCurrentTime(nextTime);
+    commitServerSeek(nextTime);
+
     setSeekFeedback(deltaSeconds > 0 ? 'forward' : 'backward');
     if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
     seekFeedbackTimerRef.current = setTimeout(() => {
       setSeekFeedback(null);
     }, 750);
-    showToast(deltaSeconds > 0 ? `⏩ +${deltaSeconds}s Forward` : `⏪ ${deltaSeconds}s Backward`, 1400);
+    showToast(
+      deltaSeconds > 0
+        ? `⏩ +${deltaSeconds}s Forward (${formatTime(nextTime)})`
+        : `⏪ ${deltaSeconds}s Backward (${formatTime(nextTime)})`,
+      1600
+    );
   };
 
   const handleSeekBarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const targetSec = Number(e.target.value);
+    currentTimeRef.current = targetSec;
     setCurrentTime(targetSec);
-    sendPlayerCommand('seek', targetSec);
+    commitServerSeek(targetSec);
   };
 
   const handleToggleMute = () => {
     setIsMuted((prev) => {
       const next = !prev;
-      sendPlayerCommand(next ? 'mute' : 'unmute');
+      if (useDirectStream) {
+        sendPlayerCommand(next ? 'mute' : 'unmute');
+      } else {
+        setStreamStartAt(Math.max(0, Math.floor(currentTimeRef.current)));
+        sendPlayerCommand(next ? 'mute' : 'unmute');
+      }
+      showToast(next ? '🔇 Audio Muted' : '🔊 Audio Unmuted', 1400);
       return next;
     });
   };
@@ -474,8 +613,16 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
     setVolume(val);
-    setIsMuted(val === 0);
+    const shouldMute = val === 0;
+    if (shouldMute !== isMuted) {
+      setIsMuted(shouldMute);
+    }
     sendPlayerCommand('volume', val);
+    if (shouldMute) {
+      sendPlayerCommand('mute');
+    } else {
+      sendPlayerCommand('unmute');
+    }
   };
 
   const handleSpeedChange = (spd: number) => {
@@ -562,7 +709,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  // Listen for iframe postMessage events (time updates, duration, ended, and failover)
+  // Listen for real-time iframe postMessage events (VidLink Pro, VidFast Pro PLAYER_EVENT & YouTube infoDelivery)
   useEffect(() => {
     const handleWindowMessage = (event: MessageEvent) => {
       try {
@@ -575,10 +722,33 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
           }
         }
 
-        // Sync live currentTime and duration from embedded player if provided
         if (typeof payload === 'object' && payload !== null) {
+          // 1. VidLink Pro & VidFast Pro real-time PLAYER_EVENT telemetry
+          if (payload.type === 'PLAYER_EVENT' && payload.data) {
+            const evData = payload.data;
+            if (
+              typeof evData.currentTime === 'number' &&
+              evData.currentTime > 0 &&
+              Date.now() - lastManualSeekAtRef.current > 1800
+            ) {
+              setCurrentTime(Math.floor(evData.currentTime));
+            }
+            if (typeof evData.duration === 'number' && evData.duration > 60) {
+              setDuration(Math.floor(evData.duration));
+            }
+            if (evData.event === 'ended') {
+              triggerNextEpisodeCountdown();
+              return;
+            }
+          }
+
+          // 2. YouTube IFrame JS API infoDelivery / onStateChange telemetry
           const info = payload.info || payload.data || payload;
-          if (typeof info.currentTime === 'number' && info.currentTime > 0) {
+          if (
+            typeof info.currentTime === 'number' &&
+            info.currentTime > 0 &&
+            Date.now() - lastManualSeekAtRef.current > 1800
+          ) {
             setCurrentTime(Math.floor(info.currentTime));
           }
           if (typeof info.duration === 'number' && info.duration > 60) {
@@ -644,11 +814,17 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     resolvedDirectStreams.length,
   ]);
 
-  // Compute active stream URL automatically
+  // Compute active stream URL with real-time startAt seeking & mute synchronization
   const activeDirectObj = resolvedDirectStreams[activeDirectStreamIndex];
+  const baseDirectUrl = activeDirectObj?.embedUrl || '';
+  const directUrlWithStart =
+    baseDirectUrl && streamStartAt > 0
+      ? `${baseDirectUrl}&start=${Math.floor(streamStartAt)}`
+      : baseDirectUrl;
+
   const streamUrl =
     useDirectStream && activeDirectObj
-      ? activeDirectObj.embedUrl
+      ? directUrlWithStart
       : activeServer.buildUrl({
           type: isTV ? 'tv' : 'movie',
           id: media.id,
@@ -657,12 +833,16 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
           season: currentSeason,
           episode: currentEpisode,
           quality: currentQuality,
+          startAt: streamStartAt,
+          autoPlay: isPlaying,
+          muted: isMuted,
         });
 
   const handleReloadStream = () => {
+    setStreamStartAt(Math.max(0, Math.floor(currentTimeRef.current)));
     setIframeKey((prev) => prev + 1);
     setIsPlaying(true);
-    showToast('Reloading stream in CineStream Player...');
+    showToast(`Reloading stream at ${formatTime(currentTimeRef.current)}...`);
   };
 
   const currentSeasonEpisodes = episodesMap[currentSeason] || [];
@@ -708,19 +888,29 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     }
   };
 
-  // Keyboard & Remote Hotkeys for CineStream Custom Video Player
+  // Keyboard & TV Remote Hotkeys for CineStream Custom Video Player
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
-      if (e.key === ' ' || e.key === 'k' || e.key === 'K') {
+      if (e.key === ' ' || e.key === 'k' || e.key === 'K' || e.key === 'MediaPlayPause') {
         e.preventDefault();
         handleTogglePlayPause();
-      } else if (e.key === 'j' || e.key === 'J' || (e.shiftKey && e.key === 'ArrowLeft')) {
+      } else if (
+        e.key === 'j' ||
+        e.key === 'J' ||
+        e.key === 'MediaRewind' ||
+        (e.shiftKey && e.key === 'ArrowLeft')
+      ) {
         e.preventDefault();
         handleSeekByOffset(-10);
-      } else if (e.key === 'l' || e.key === 'L' || (e.shiftKey && e.key === 'ArrowRight')) {
+      } else if (
+        e.key === 'l' ||
+        e.key === 'L' ||
+        e.key === 'MediaFastForward' ||
+        (e.shiftKey && e.key === 'ArrowRight')
+      ) {
         e.preventDefault();
         handleSeekByOffset(10);
       } else if (e.key === 'f' || e.key === 'F') {
@@ -741,11 +931,12 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [duration, isTV, currentSeason, currentEpisode]);
+  }, [duration, isTV, currentSeason, currentEpisode, useDirectStream]);
 
   const handleQualityChange = (q: VideoQuality) => {
     setCurrentQuality(q);
     setShowQualityMenu(false);
+    setStreamStartAt(Math.max(0, Math.floor(currentTimeRef.current)));
     try {
       localStorage.setItem('cinestream_preferred_quality', q);
     } catch {}
@@ -753,23 +944,22 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     showToast(`Video Quality set to ${q.toUpperCase()}`);
   };
 
-  // Idle timer: keeps controls visible whenever any dropdown menu is open!
+  // Idle timer: keeps controls visible whenever any dropdown menu is open or video is paused
   const resetIdleTimer = useCallback(() => {
     setShowControlsOverlay(true);
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    if (isAnyMenuOpen) {
-      // Never auto-close or hide overlay while the user has a dropdown open
+    if (isAnyMenuOpen || !isPlaying) {
       return;
     }
     idleTimerRef.current = setTimeout(() => {
-      if (!isAnyMenuOpen) {
+      if (!isAnyMenuOpen && isPlaying) {
         setShowControlsOverlay(false);
       }
-    }, 5000);
-  }, [isAnyMenuOpen]);
+    }, 4500);
+  }, [isAnyMenuOpen, isPlaying]);
 
   useEffect(() => {
-    if (isAnyMenuOpen) {
+    if (isAnyMenuOpen || !isPlaying) {
       setShowControlsOverlay(true);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       return;
@@ -778,9 +968,25 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
-  }, [streamUrl, isAnyMenuOpen, resetIdleTimer]);
+  }, [streamUrl, isAnyMenuOpen, isPlaying, resetIdleTimer]);
+
+  // Interactive surface click/double-click handler on CineStream Player
+  const handleSurfaceDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    if (clickX < rect.width * 0.35) {
+      handleSeekByOffset(-10);
+    } else if (clickX > rect.width * 0.65) {
+      handleSeekByOffset(10);
+    } else {
+      toggleFullscreen();
+    }
+  };
 
   const progressPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
+
+  // When paused on a multi-CDN server (non-direct), suspending the iframe stops background playback 100% immediately
+  const isServerPausedOverlayActive = !isPlaying && !useDirectStream;
 
   return (
     <div
@@ -893,7 +1099,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             : 'opacity-0 pointer-events-none'
         } ${
           isFullscreen
-            ? 'absolute top-0 left-0 right-0 bg-gradient-to-b from-black/95 via-black/70 to-transparent'
+            ? 'absolute top-0 left-0 right-0 bg-gradient-to-b from-black/95 via-black/75 to-transparent'
             : 'bg-slate-950 border-b border-slate-900'
         } px-3 py-2.5 sm:px-6 lg:px-10 flex items-center justify-between gap-2`}
       >
@@ -927,7 +1133,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                 ·
               </span>
               <span className="text-emerald-400 font-semibold truncate">
-                CineStream Player ({useDirectStream ? 'Direct HD' : activeServer.badge})
+                CineStream Player (Server {serverIndex + 1}: {activeServer.badge})
               </span>
             </div>
           </div>
@@ -971,9 +1177,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
               title="Select Stream Server (Plays inside CineStream Video Player)"
             >
               <Server className="w-3.5 h-3.5" />
-              <span>
-                {useDirectStream ? 'Server: Direct HD' : `Server ${serverIndex + 1}`}
-              </span>
+              <span>Server {serverIndex + 1}</span>
             </button>
 
             {showSourceMenu && (
@@ -987,7 +1191,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                       Select Server (CineStream Player)
                     </div>
                     <p className="text-[10px] text-slate-400 mt-0.5">
-                      Every server plays directly on this screen inside CineStream Player:
+                      Redirects stream into CineStream Player with full timeline control:
                     </p>
                   </div>
                   <button
@@ -1000,14 +1204,14 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                   </button>
                 </div>
 
-                {/* Clean 7 Primary Multi-CDN Servers (First 3 Broadcast Stream entries removed as requested) */}
+                {/* 6 Verified Servers (Old Server 1 & Server 8 removed as requested) */}
                 {STREAM_SERVERS.map((srv, idx) => {
-                  const isCurrent = !useDirectStream && idx === serverIndex;
+                  const isCurrent = idx === serverIndex;
                   return (
                     <button
                       type="button"
                       key={srv.id}
-                      onClick={() => handleManualSwitchSource(idx, false)}
+                      onClick={() => handleManualSwitchSource(idx)}
                       data-tv-nav="true"
                       className={`tv-focus w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-colors ${
                         isCurrent
@@ -1025,30 +1229,6 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                     </button>
                   );
                 })}
-
-                {/* Single verified Direct HD option when available for Indian TV Serials / Sitcoms */}
-                {resolvedDirectStreams.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => handleManualSwitchSource(0, true)}
-                    data-tv-nav="true"
-                    className={`tv-focus w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-colors ${
-                      useDirectStream
-                        ? 'bg-emerald-500/20 text-white font-bold border border-emerald-500/50'
-                        : 'text-emerald-300 hover:text-white hover:bg-slate-800'
-                    }`}
-                  >
-                    <div className="min-w-0 pr-2">
-                      <div className="text-xs font-bold truncate">
-                        Server {STREAM_SERVERS.length + 1}: Indian TV & Serial Direct HD
-                      </div>
-                      <div className="text-[10px] text-slate-400 truncate">
-                        Instant 1080p Native Stream
-                      </div>
-                    </div>
-                    {useDirectStream && <Check className="w-4 h-4 text-emerald-400 shrink-0" />}
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -1122,7 +1302,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             onClick={handleReloadStream}
             data-tv-nav="true"
             className="tv-focus hidden lg:flex items-center gap-1 px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold border border-slate-800"
-            title="Reload Stream (R)"
+            title="Reload Stream at Current Time (R)"
           >
             <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
           </button>
@@ -1154,14 +1334,42 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
               Loading {media.title} in CineStream Player...
             </p>
           </div>
+        ) : isServerPausedOverlayActive ? (
+          /* When paused on a multi-CDN server, we suspend the iframe so audio & video stop 100% immediately */
+          <div
+            onClick={handleTogglePlayPause}
+            className="relative w-full h-full flex flex-col items-center justify-center bg-slate-950 cursor-pointer select-none overflow-hidden"
+          >
+            {(media.backdrop || media.poster) && (
+              <img
+                src={media.backdrop || media.poster}
+                alt={media.title}
+                referrerPolicy="no-referrer"
+                className="absolute inset-0 w-full h-full object-cover opacity-35 blur-[2px] scale-105"
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/80" />
+            <div className="relative z-10 flex flex-col items-center gap-3 px-6 text-center">
+              <div className="px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-extrabold tracking-wide">
+                PAUSED AT {formatTime(currentTime)}
+              </div>
+              <h3 className="text-lg sm:text-2xl font-extrabold text-white font-display">
+                {media.title}
+                {isTV ? ` · S${currentSeason}:E${currentEpisode}` : ''}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300">
+                Click Play or press Space / OK to resume from {formatTime(currentTime)}
+              </p>
+            </div>
+          </div>
         ) : (
           <div
             className={`w-full h-full transition-transform duration-300 ${
               aspectFit === 'zoom'
-                ? 'scale-[1.15]'
+                ? 'scale-[1.16]'
                 : aspectFit === 'stretch'
-                ? 'scale-x-[1.10] scale-y-[1.04]'
-                : 'scale-100'
+                ? 'scale-x-[1.12] scale-y-[1.06]'
+                : 'scale-[1.02]'
             }`}
           >
             <iframe
@@ -1172,22 +1380,48 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowFullScreen
               referrerPolicy="origin"
+              onLoad={handleIframeLoad}
               onError={() => triggerAutomaticFailover('Connection timeout')}
               className="w-full h-full border-0 bg-black"
             />
           </div>
         )}
 
+        {/* Interactive CineStream Player Surface: routes clicks & double-taps to OUR custom player controls
+            instead of the background server's player */}
+        {!isResolvingAutoStream && !isServerPausedOverlayActive && !allowEmbedPassthrough && (
+          <div
+            onClick={() => {
+              if (!showControlsOverlay) {
+                resetIdleTimer();
+              } else {
+                handleTogglePlayPause();
+              }
+            }}
+            onDoubleClick={handleSurfaceDoubleClick}
+            className="absolute inset-0 z-10 cursor-pointer bg-transparent"
+            title="Click to Play/Pause · Double-Click Left (-10s) / Right (+10s)"
+          />
+        )}
+
+        {/* Loading indicator when jumping to a new timestamp on server */}
+        {isSeekingOnServer && (
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-30 pointer-events-none px-4 py-1.5 rounded-full bg-slate-950/90 border border-amber-500/50 text-amber-300 text-xs font-bold flex items-center gap-2 shadow-xl">
+            <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+            <span>Jumping to {formatTime(currentTime)}...</span>
+          </div>
+        )}
+
         {/* Visual -10s / +10s Seek Ripple Feedback */}
         {seekFeedback === 'backward' && (
-          <div className="absolute left-6 sm:left-16 top-1/2 -translate-y-1/2 z-30 pointer-events-none flex flex-col items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-black/75 border border-amber-500/50 text-amber-400 shadow-2xl">
+          <div className="absolute left-6 sm:left-16 top-1/2 -translate-y-1/2 z-30 pointer-events-none flex flex-col items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-black/80 border border-amber-500/50 text-amber-400 shadow-2xl">
             <RotateCcw className="w-7 h-7 sm:w-8 sm:h-8" />
             <span className="text-xs font-extrabold font-mono mt-1">-10s</span>
           </div>
         )}
 
         {seekFeedback === 'forward' && (
-          <div className="absolute right-6 sm:right-16 top-1/2 -translate-y-1/2 z-30 pointer-events-none flex flex-col items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-black/75 border border-amber-500/50 text-amber-400 shadow-2xl">
+          <div className="absolute right-6 sm:right-16 top-1/2 -translate-y-1/2 z-30 pointer-events-none flex flex-col items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-black/80 border border-amber-500/50 text-amber-400 shadow-2xl">
             <RotateCw className="w-7 h-7 sm:w-8 sm:h-8" />
             <span className="text-xs font-extrabold font-mono mt-1">+10s</span>
           </div>
@@ -1198,9 +1432,12 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
           <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-20 flex items-center justify-center gap-6 sm:gap-12 pointer-events-none">
             <button
               type="button"
-              onClick={() => handleSeekByOffset(-10)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSeekByOffset(-10);
+              }}
               data-tv-nav="true"
-              className="tv-focus pointer-events-auto flex flex-col items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-slate-950/80 hover:bg-amber-500 hover:text-slate-950 text-white border border-white/20 backdrop-blur-md shadow-2xl transition-all active:scale-90"
+              className="tv-focus pointer-events-auto flex flex-col items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-slate-950/85 hover:bg-amber-500 hover:text-slate-950 text-white border border-white/20 backdrop-blur-md shadow-2xl transition-all active:scale-90"
               title="Rewind 10 Seconds (-10s)"
             >
               <RotateCcw className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -1209,10 +1446,13 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
 
             <button
               type="button"
-              onClick={handleTogglePlayPause}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTogglePlayPause();
+              }}
               data-tv-nav="true"
               className="tv-focus pointer-events-auto flex items-center justify-center w-15 h-15 sm:w-20 sm:h-20 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-2xl shadow-amber-500/40 transition-all active:scale-90"
-              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+              title={isPlaying ? 'Pause Video (Space)' : 'Play Video (Space)'}
             >
               {isPlaying ? (
                 <Pause className="w-7 h-7 sm:w-9 sm:h-9 fill-slate-950" />
@@ -1223,9 +1463,12 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
 
             <button
               type="button"
-              onClick={() => handleSeekByOffset(10)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSeekByOffset(10);
+              }}
               data-tv-nav="true"
-              className="tv-focus pointer-events-auto flex flex-col items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-slate-950/80 hover:bg-amber-500 hover:text-slate-950 text-white border border-white/20 backdrop-blur-md shadow-2xl transition-all active:scale-90"
+              className="tv-focus pointer-events-auto flex flex-col items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-slate-950/85 hover:bg-amber-500 hover:text-slate-950 text-white border border-white/20 backdrop-blur-md shadow-2xl transition-all active:scale-90"
               title="Fast-Forward 10 Seconds (+10s)"
             >
               <RotateCw className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -1244,7 +1487,8 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
         {/* Unified CineStream Bottom Video Player Control Deck (Tailored for Movies vs Web Series/TV) */}
         <div
           ref={bottomMenusRef}
-          className={`absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/95 via-black/85 to-transparent px-3 sm:px-6 lg:px-10 pt-8 pb-3 sm:pb-4 transition-opacity duration-200 ${
+          onClick={(e) => e.stopPropagation()}
+          className={`absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black via-black/95 to-transparent px-3 sm:px-6 lg:px-10 pt-10 pb-3 sm:pb-4 transition-opacity duration-200 ${
             showControlsOverlay || isAnyMenuOpen || !isPlaying
               ? 'opacity-100'
               : 'opacity-0 pointer-events-none'
@@ -1270,14 +1514,14 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             </div>
           ) : (
             <div className="space-y-2.5">
-              {/* Interactive Seekbar / Scrubber Row */}
+              {/* Interactive Seekbar / Scrubber Row (Actually seeks the video on all servers) */}
               <div className="flex items-center gap-3">
                 <span className="text-[11px] sm:text-xs font-mono tabular-nums text-amber-400 font-bold shrink-0">
                   {formatTime(currentTime)}
                 </span>
 
-                <div className="relative flex-1 flex items-center group">
-                  <div className="w-full h-1.5 sm:h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div className="relative flex-1 flex items-center group py-1.5">
+                  <div className="w-full h-2 sm:h-2.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700/60">
                     <div
                       className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full"
                       style={{ width: `${progressPercent}%` }}
@@ -1308,7 +1552,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                     onClick={handleTogglePlayPause}
                     data-tv-nav="true"
                     className="tv-focus flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md transition-transform active:scale-95"
-                    title={isPlaying ? 'Pause' : 'Play'}
+                    title={isPlaying ? 'Pause Video' : 'Play Video'}
                   >
                     {isPlaying ? (
                       <Pause className="w-4 h-4 sm:w-5 sm:h-5 fill-slate-950" />
@@ -1444,7 +1688,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                   )}
                 </div>
 
-                {/* Right Utility Controls: Audio/Subtitles, Speed, Aspect Fit, Lock, Fullscreen */}
+                {/* Right Utility Controls: Audio/Subtitles, Speed, Aspect Fit, Embed Touch, Lock, Fullscreen */}
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   {/* Audio & Subtitles Menu */}
                   <div className="relative">
@@ -1615,6 +1859,31 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                     <span className="capitalize">{aspectFit}</span>
                   </button>
 
+                  {/* Optional Direct Embed Touch Toggle (in case a browser blocks autoplay and needs 1 tap on embed) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAllowEmbedPassthrough((prev) => {
+                        const next = !prev;
+                        showToast(
+                          next
+                            ? 'Direct Server Touch Enabled (Tap again to lock to CineStream Player)'
+                            : 'CineStream Player Controls Active'
+                        );
+                        return next;
+                      });
+                    }}
+                    data-tv-nav="true"
+                    className={`tv-focus hidden md:flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold border whitespace-nowrap ${
+                      allowEmbedPassthrough
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                        : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-700/80'
+                    }`}
+                    title="Toggle Direct Embed Touch if a server requires manual click"
+                  >
+                    <MousePointerClick className="w-3.5 h-3.5" />
+                  </button>
+
                   {/* Lock Touch Controls */}
                   <button
                     type="button"
@@ -1654,7 +1923,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
       {/* Details, Server Bar & Interactive Episodes Section Below Video (Hidden in Fullscreen) */}
       {!isFullscreen && (
         <div className="max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-10 2xl:px-14 py-5 sm:py-8 space-y-6">
-          {/* Quick Horizontal Server Switcher Pill Bar (1-Click Server Selection on the same player) */}
+          {/* Quick Horizontal Server Switcher Pill Bar (6 Clean Servers: Old Server 1 & Server 8 removed) */}
           <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900/90 border border-slate-800/90 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-200 shrink-0">
               <Server className="w-4 h-4 text-amber-400" />
@@ -1663,12 +1932,12 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
 
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 md:pb-0">
               {STREAM_SERVERS.map((srv, idx) => {
-                const isCurrent = !useDirectStream && idx === serverIndex;
+                const isCurrent = idx === serverIndex;
                 return (
                   <button
                     type="button"
                     key={srv.id}
-                    onClick={() => handleManualSwitchSource(idx, false)}
+                    onClick={() => handleManualSwitchSource(idx)}
                     data-tv-nav="true"
                     className={`tv-focus px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 border transition-all ${
                       isCurrent
@@ -1676,25 +1945,10 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                         : 'bg-slate-950 text-slate-300 hover:text-white border-slate-800 hover:border-slate-700'
                     }`}
                   >
-                    Server {idx + 1}: {srv.badge.replace(/\s*\(TV Safe\)/i, '')}
+                    Server {idx + 1}: {srv.badge}
                   </button>
                 );
               })}
-
-              {resolvedDirectStreams.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => handleManualSwitchSource(0, true)}
-                  data-tv-nav="true"
-                  className={`tv-focus px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 border transition-all ${
-                    useDirectStream
-                      ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md'
-                      : 'bg-slate-950 text-emerald-400 hover:text-emerald-300 border-emerald-500/30'
-                  }`}
-                >
-                  Direct HD Stream
-                </button>
-              )}
             </div>
           </div>
 
