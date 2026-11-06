@@ -58,13 +58,20 @@ import {
   Mic,
   Download,
   Plus,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CornerDownLeft,
+  Menu,
+  Gamepad2,
 } from 'lucide-react';
 
 export default function App() {
   const { isTvMode, setIsTvMode, toggleTvMode } = useTvMode();
 
   // Activate 2D spatial grid navigation for Smart TV / Airtel Xstream Box D-pad traversal
-  useTvSpatialNavigation(true);
+  const { navigateDirection, focusPrimaryElement } = useTvSpatialNavigation(true);
 
   // Navigation state
   const [currentTab, setCurrentTab] = useState<string>('all');
@@ -87,6 +94,7 @@ export default function App() {
   const [showTvGuide, setShowTvGuide] = useState<boolean>(false);
   const [showVoiceSearch, setShowVoiceSearch] = useState<boolean>(false);
   const [showInstallModal, setShowInstallModal] = useState<boolean>(false);
+  const [showVirtualRemote, setShowVirtualRemote] = useState<boolean>(false);
 
   // Live Auto-Sync Feeds State (Automatically pulls new OTT releases from TMDB)
   const [liveFeeds, setLiveFeeds] = useState<{
@@ -362,16 +370,45 @@ export default function App() {
     handlePlayMedia(item, params.season, params.episode);
   };
 
-  // Smart TV / Airtel Xstream Remote hotkeys handler
+  // Auto-focus primary button when switching views so TV remote D-pad is always active immediately
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!document.activeElement || document.activeElement === document.body) {
+        focusPrimaryElement();
+      }
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [currentTab, selectedOtt, activeMedia, focusPrimaryElement]);
+
+  const handleTriggerTvMenuFocus = () => {
+    const navBtn = document.querySelector<HTMLElement>(
+      'aside[aria-label="Smart TV Navigation Rail"] button.tv-focus, header nav button.tv-focus, header button.tv-focus'
+    );
+    if (navBtn) {
+      navBtn.focus();
+      navBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      focusPrimaryElement();
+    }
+  };
+
+  const handleTriggerTvBack = () => {
+    if (showInstallModal) setShowInstallModal(false);
+    else if (showVoiceSearch) setShowVoiceSearch(false);
+    else if (showDirectModal) setShowDirectModal(false);
+    else if (showTvGuide) setShowTvGuide(false);
+    else if (activeMedia) setActiveMedia(null);
+    else if (selectedOtt) setSelectedOtt(null);
+    else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      handleTriggerTvMenuFocus();
+    }
+  };
+
+  // Smart TV / Airtel Xstream Remote hotkeys handler (Back, Menu, Voice, Server, Episode)
   useTvHotkeys({
-    onBack: () => {
-      if (showInstallModal) setShowInstallModal(false);
-      else if (showVoiceSearch) setShowVoiceSearch(false);
-      else if (showDirectModal) setShowDirectModal(false);
-      else if (showTvGuide) setShowTvGuide(false);
-      else if (activeMedia) setActiveMedia(null);
-      else if (selectedOtt) setSelectedOtt(null);
-    },
+    onBack: handleTriggerTvBack,
+    onMenu: handleTriggerTvMenuFocus,
     onVoiceSearch: () => {
       setShowVoiceSearch(true);
     },
@@ -1027,30 +1064,151 @@ export default function App() {
         </button>
       </nav>
 
-      {/* Floating Smart TV Remote Guide & App Download Shortcut (Tablet, Laptop, Desktop & TV) */}
+      {/* Floating Smart TV Remote D-Pad Controller & App Download Shortcut (TV Browser & Desktop) */}
       <aside
         aria-label="Smart TV shortcuts"
-        className="hidden md:flex fixed bottom-4 right-4 z-30 items-center gap-2"
+        className="hidden md:flex fixed bottom-4 right-4 z-40 flex-col items-end gap-2.5"
       >
-        <button
-          onClick={() => setShowInstallModal(true)}
-          data-tv-nav="true"
-          className="tv-focus flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-xl shadow-emerald-500/25 text-xs font-extrabold transition-all"
-          title="Add to Home Screen / Install TV App (Airtel Xstream Box) & Mobile App"
-        >
-          <Download className="w-4 h-4 stroke-[2.5]" />
-          <span>Add to Home Screen / Install App</span>
-        </button>
+        {/* On-Screen Interactive TV Remote D-Pad (Up, Down, Left, Right, OK, Menu, Back) for TV Browsers */}
+        {showVirtualRemote && (
+          <div className="bg-slate-900/95 border border-amber-500/50 rounded-3xl p-3.5 shadow-2xl backdrop-blur-xl w-52 space-y-3 text-center">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-1.5 text-xs font-extrabold text-amber-400">
+                <Gamepad2 className="w-4 h-4" />
+                <span>TV Remote D-Pad</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowVirtualRemote(false)}
+                className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                title="Close Remote Pad"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
-        <button
-          onClick={() => setShowTvGuide(true)}
-          data-tv-nav="true"
-          className="tv-focus flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-400 border border-slate-700 shadow-xl backdrop-blur-md text-xs font-semibold"
-          title="TV Remote Shortcuts Guide"
-        >
-          <Tv className="w-4 h-4" />
-          <span>TV Remote Keys</span>
-        </button>
+            {/* Top Row: MENU and BACK */}
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={handleTriggerTvMenuFocus}
+                className="flex-1 flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-200 text-xs font-bold border border-slate-700 transition-colors"
+                title="TV Remote MENU Button"
+              >
+                <Menu className="w-3.5 h-3.5" />
+                <span>MENU</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleTriggerTvBack}
+                className="flex-1 flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-rose-500 hover:text-white text-slate-200 text-xs font-bold border border-slate-700 transition-colors"
+                title="TV Remote BACK Button"
+              >
+                <CornerDownLeft className="w-3.5 h-3.5" />
+                <span>BACK</span>
+              </button>
+            </div>
+
+            {/* 5-Way D-Pad: UP, LEFT, OK, RIGHT, DOWN */}
+            <div className="grid grid-cols-3 gap-1.5 items-center justify-items-center bg-slate-950/90 p-2.5 rounded-2xl border border-slate-800">
+              <div />
+              <button
+                type="button"
+                onClick={() => navigateDirection('up')}
+                className="w-11 h-10 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-white flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
+                title="Move Up"
+              >
+                <ChevronUp className="w-5 h-5" />
+              </button>
+              <div />
+
+              <button
+                type="button"
+                onClick={() => navigateDirection('left')}
+                className="w-11 h-10 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-white flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
+                title="Move Left"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const active = document.activeElement as HTMLElement | null;
+                  if (active && active !== document.body) {
+                    active.click();
+                  } else {
+                    focusPrimaryElement();
+                  }
+                }}
+                className="w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shadow-lg shadow-amber-500/30 active:scale-90 transition-all"
+                title="Press OK / Select on Focused Button"
+              >
+                OK
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigateDirection('right')}
+                className="w-11 h-10 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-white flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
+                title="Move Right"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+
+              <div />
+              <button
+                type="button"
+                onClick={() => navigateDirection('down')}
+                className="w-11 h-10 rounded-xl bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-white flex items-center justify-center border border-slate-700 active:scale-95 transition-all"
+                title="Move Down"
+              >
+                <ChevronDown className="w-5 h-5" />
+              </button>
+              <div />
+            </div>
+
+            <p className="text-[10px] text-slate-400 leading-tight">
+              Moves button-to-button across the app like a native TV remote
+            </p>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowInstallModal(true)}
+            data-tv-nav="true"
+            className="tv-focus flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-xl shadow-emerald-500/25 text-xs font-extrabold transition-all"
+            title="Add to Home Screen / Install TV App (Airtel Xstream Box) & Mobile App"
+          >
+            <Download className="w-4 h-4 stroke-[2.5]" />
+            <span>Add to Home Screen / Install App</span>
+          </button>
+
+          <button
+            onClick={() => setShowVirtualRemote((prev) => !prev)}
+            data-tv-nav="true"
+            className={`tv-focus flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border shadow-xl backdrop-blur-md text-xs font-bold transition-all ${
+              showVirtualRemote
+                ? 'bg-amber-500 text-slate-950 border-amber-400'
+                : 'bg-slate-900/95 hover:bg-slate-800 text-amber-400 border-amber-500/40'
+            }`}
+            title="Open On-Screen TV Remote D-Pad (Up, Down, Left, Right, OK, Menu, Back)"
+          >
+            <Gamepad2 className="w-4 h-4" />
+            <span>TV Remote Pad</span>
+          </button>
+
+          <button
+            onClick={() => setShowTvGuide(true)}
+            data-tv-nav="true"
+            className="tv-focus flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 shadow-xl backdrop-blur-md text-xs font-semibold"
+            title="TV Remote Shortcuts Guide"
+          >
+            <Tv className="w-4 h-4 text-amber-400" />
+            <span>Guide</span>
+          </button>
+        </div>
       </aside>
 
       {/* Direct IMDb / TMDB Modal */}

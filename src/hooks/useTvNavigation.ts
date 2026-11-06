@@ -5,7 +5,7 @@ export function isSmartTvUserAgent(): boolean {
   const ua = navigator.userAgent;
   const search = window.location.search;
   if (search.includes('tv=1') || search.includes('mode=tv')) return true;
-  return /SmartTV|Tizen|Web0S|webOS|AppleTV|Android.*TV|GoogleTV|HbbTV|CrKey|Viera|BRAVIA|Silk|AmazonWebAppPlatform|Airtel|Xstream|AFTB|AFTM|AFTT|MiBox|SHIELD|TV Bro/i.test(
+  return /SmartTV|Tizen|Web0S|webOS|AppleTV|Android.*TV|GoogleTV|HbbTV|CrKey|Viera|BRAVIA|Silk|AmazonWebAppPlatform|Airtel|Xstream|AFTB|AFTM|AFTT|MiBox|SHIELD|TV Bro|JioPages|Puffin/i.test(
     ua
   );
 }
@@ -42,6 +42,7 @@ export function useTvMode() {
 
 export interface TvKeyHandlers {
   onBack?: () => void;
+  onMenu?: () => void;
   onFullscreen?: () => void;
   onNextEpisode?: () => void;
   onPrevEpisode?: () => void;
@@ -51,34 +52,94 @@ export interface TvKeyHandlers {
 }
 
 export function useTvHotkeys(handlers: TvKeyHandlers, enabled = true) {
+  // Intercept browser history back (Android TV / Airtel Xstream remote physical Back button)
+  useEffect(() => {
+    if (!enabled) return;
+
+    try {
+      window.history.pushState({ cinestreamTvGuard: true }, '');
+    } catch {}
+
+    const handlePopState = () => {
+      if (handlers.onBack) {
+        handlers.onBack();
+      }
+      try {
+        window.history.pushState({ cinestreamTvGuard: true }, '');
+      } catch {}
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [handlers, enabled]);
+
   useEffect(() => {
     if (!enabled) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept when user is typing in an input
       const target = e.target as HTMLElement;
       const isInput =
         target &&
-        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) &&
+        (target as HTMLInputElement).type !== 'range';
+
+      const keyCode = e.keyCode || e.which;
 
       if (isInput) {
-        if (e.key === 'Escape' || e.key === 'GoBack' || e.key === 'BrowserBack') {
+        if (
+          e.key === 'Escape' ||
+          e.key === 'GoBack' ||
+          e.key === 'BrowserBack' ||
+          keyCode === 4 ||
+          keyCode === 27
+        ) {
+          e.preventDefault();
           target.blur();
         }
         return;
       }
 
+      // 1. Remote BACK Button (Android TV, Airtel Xstream, Tizen, WebOS, Standard)
+      if (
+        e.key === 'Escape' ||
+        e.key === 'Backspace' ||
+        e.key === 'GoBack' ||
+        e.key === 'BrowserBack' ||
+        e.key === 'XF86Back' ||
+        keyCode === 4 ||
+        keyCode === 8 ||
+        keyCode === 27 ||
+        keyCode === 461 ||
+        keyCode === 10009
+      ) {
+        if (handlers.onBack) {
+          e.preventDefault();
+          handlers.onBack();
+        }
+        return;
+      }
+
+      // 2. Remote MENU / GUIDE / INFO Button
+      if (
+        e.key === 'ContextMenu' ||
+        e.key === 'Menu' ||
+        e.key === 'Info' ||
+        e.key === 'Guide' ||
+        e.key === 'F1' ||
+        e.key === 'g' ||
+        e.key === 'G' ||
+        keyCode === 82 ||
+        keyCode === 165 ||
+        keyCode === 457
+      ) {
+        if (handlers.onMenu) {
+          e.preventDefault();
+          handlers.onMenu();
+        }
+        return;
+      }
+
       switch (e.key) {
-        case 'Escape':
-        case 'Backspace':
-        case 'GoBack':
-        case 'BrowserBack':
-        case ' XF86Back':
-          if (handlers.onBack) {
-            e.preventDefault();
-            handlers.onBack();
-          }
-          break;
         case 'f':
         case 'F':
           if (handlers.onFullscreen) {
@@ -122,7 +183,6 @@ export function useTvHotkeys(handlers: TvKeyHandlers, enabled = true) {
           break;
         case 'v':
         case 'V':
-        case 'AudioVolumeMute':
         case 'ColorF2Yellow':
           if (handlers.onVoiceSearch) {
             e.preventDefault();
@@ -138,9 +198,9 @@ export function useTvHotkeys(handlers: TvKeyHandlers, enabled = true) {
 }
 
 /**
- * 2D Spatial Grid Focus Navigation System for Smart TVs / D-pad Remotes
- * Handles ArrowUp, ArrowDown, ArrowLeft, ArrowRight, and Enter keys.
- * Calculates geometric vector distances across visible interactive cards and buttons.
+ * 2D Button-to-Button Spatial Focus Navigation System for Smart TVs & Airtel Xstream Remotes
+ * Handles Up, Down, Left, Right, OK/Enter, and Menu keys across all buttons and cards,
+ * and prevents embedded iframes from stealing remote focus.
  */
 export function useTvSpatialNavigation(enabled = true) {
   const lastActiveElementRef = useRef<HTMLElement | null>(null);
@@ -148,7 +208,7 @@ export function useTvSpatialNavigation(enabled = true) {
   const getNavigableElements = useCallback((): HTMLElement[] => {
     if (typeof document === 'undefined') return [];
 
-    // If an open modal exists, restrict navigation within that modal dialog
+    // If an open modal dialog exists, restrict D-pad navigation inside that modal
     const openModal = document.querySelector<HTMLElement>('[role="dialog"][aria-modal="true"]');
     const container: ParentNode = openModal || document;
 
@@ -164,7 +224,6 @@ export function useTvSpatialNavigation(enabled = true) {
     const nodes = Array.from(container.querySelectorAll<HTMLElement>(selectors));
 
     return nodes.filter((el) => {
-      // Must be visible and interactive
       if (el.hasAttribute('disabled') || el.getAttribute('aria-hidden') === 'true') {
         return false;
       }
@@ -177,6 +236,40 @@ export function useTvSpatialNavigation(enabled = true) {
     });
   }, []);
 
+  const focusElementSmoothly = useCallback((target: HTMLElement, direction?: string) => {
+    target.focus({ preventScroll: true });
+    lastActiveElementRef.current = target;
+
+    const scrollContainer = target.closest('.overflow-x-auto, .overflow-y-auto');
+    if (scrollContainer && (direction === 'left' || direction === 'right')) {
+      target.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    } else {
+      target.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest',
+      });
+    }
+  }, []);
+
+  const focusPrimaryElement = useCallback(() => {
+    const candidates = getNavigableElements();
+    if (candidates.length === 0) return;
+
+    const preferred =
+      candidates.find((c) => c.getAttribute('data-tv-autofocus') === 'true') ||
+      candidates.find((c) => c.getAttribute('data-tv-card') === 'true') ||
+      candidates[0];
+
+    if (preferred) {
+      focusElementSmoothly(preferred);
+    }
+  }, [getNavigableElements, focusElementSmoothly]);
+
   const navigateDirection = useCallback(
     (direction: 'up' | 'down' | 'left' | 'right') => {
       const candidates = getNavigableElements();
@@ -184,13 +277,13 @@ export function useTvSpatialNavigation(enabled = true) {
 
       const active = document.activeElement as HTMLElement | null;
 
-      // If nothing is focused yet, or activeElement is outside navigable pool, focus closest or first
+      // If nothing is focused yet or focus fell outside navigable buttons, focus the best starting button
       if (!active || !candidates.includes(active)) {
-        // Find first card or first navigable element
-        const firstCard = candidates.find((c) => c.getAttribute('data-tv-card') === 'true');
-        const target = firstCard || candidates[0];
-        target.focus();
-        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        if (lastActiveElementRef.current && candidates.includes(lastActiveElementRef.current)) {
+          focusElementSmoothly(lastActiveElementRef.current, direction);
+          return;
+        }
+        focusPrimaryElement();
         return;
       }
 
@@ -198,6 +291,38 @@ export function useTvSpatialNavigation(enabled = true) {
       const curCenterX = curRect.left + curRect.width / 2;
       const curCenterY = curRect.top + curRect.height / 2;
 
+      if (direction === 'left' || direction === 'right') {
+        // Horizontal navigation: prioritize buttons in the same visual row first
+        const rowTolerance = Math.max(curRect.height * 0.9, 44);
+        const sameRowCandidates = candidates.filter((cand) => {
+          if (cand === active) return false;
+          const r = cand.getBoundingClientRect();
+          const cy = r.top + r.height / 2;
+          const isSameRow = Math.abs(cy - curCenterY) <= rowTolerance;
+          if (!isSameRow) return false;
+          return direction === 'right' ? r.left > curRect.left + 4 : r.right < curRect.right - 4;
+        });
+
+        if (sameRowCandidates.length > 0) {
+          sameRowCandidates.sort((a, b) => {
+            const ra = a.getBoundingClientRect();
+            const rb = b.getBoundingClientRect();
+            const distA =
+              direction === 'right'
+                ? Math.abs(ra.left - curRect.right)
+                : Math.abs(curRect.left - ra.right);
+            const distB =
+              direction === 'right'
+                ? Math.abs(rb.left - curRect.right)
+                : Math.abs(curRect.left - rb.right);
+            return distA - distB;
+          });
+          focusElementSmoothly(sameRowCandidates[0], direction);
+          return;
+        }
+      }
+
+      // General 2D row-aware navigation (Up / Down and cross-region Left / Right)
       let bestCandidate: HTMLElement | null = null;
       let minScore = Infinity;
 
@@ -213,48 +338,39 @@ export function useTvSpatialNavigation(enabled = true) {
 
         switch (direction) {
           case 'right': {
-            // Must be strictly to the right
-            if (candRect.left > curRect.left + 8) {
+            if (candCenterX > curCenterX + 8) {
               isValidDirection = true;
-              const dx = candRect.left - curRect.right;
-              const primaryDist = dx >= 0 ? dx : Math.abs(candRect.left - curRect.left);
-              const crossDist = Math.abs(candCenterY - curCenterY);
-              // Penalize vertical divergence strongly so horizontal row navigation stays in the same row
-              score = primaryDist + crossDist * 3.0;
+              const dx = Math.max(0, candRect.left - curRect.right);
+              const dy = Math.abs(candCenterY - curCenterY);
+              score = dx + dy * 3.2;
             }
             break;
           }
           case 'left': {
-            // Must be strictly to the left
-            if (candRect.right < curRect.right - 8) {
+            if (candCenterX < curCenterX - 8) {
               isValidDirection = true;
-              const dx = curRect.left - candRect.right;
-              const primaryDist = dx >= 0 ? dx : Math.abs(curRect.right - candRect.right);
-              const crossDist = Math.abs(candCenterY - curCenterY);
-              score = primaryDist + crossDist * 3.0;
+              const dx = Math.max(0, curRect.left - candRect.right);
+              const dy = Math.abs(candCenterY - curCenterY);
+              score = dx + dy * 3.2;
             }
             break;
           }
           case 'down': {
-            // Must be strictly below
-            if (candRect.top > curRect.top + 10) {
+            if (candCenterY > curCenterY + 12) {
               isValidDirection = true;
-              const dy = candRect.top - curRect.bottom;
-              const primaryDist = dy >= 0 ? dy : Math.abs(candRect.top - curRect.top);
-              const crossDist = Math.abs(candCenterX - curCenterX);
-              // Heavily reward columns that line up with the current element's X center
-              score = primaryDist + crossDist * 1.8;
+              const dy = Math.max(0, candRect.top - curRect.bottom);
+              const dx = Math.abs(candCenterX - curCenterX);
+              // Prioritize the immediately next row below, then closest X alignment
+              score = dy * 2.5 + dx * 0.85;
             }
             break;
           }
           case 'up': {
-            // Must be strictly above
-            if (candRect.bottom < curRect.bottom - 10) {
+            if (candCenterY < curCenterY - 12) {
               isValidDirection = true;
-              const dy = curRect.top - candRect.bottom;
-              const primaryDist = dy >= 0 ? dy : Math.abs(curRect.bottom - candRect.bottom);
-              const crossDist = Math.abs(candCenterX - curCenterX);
-              score = primaryDist + crossDist * 1.8;
+              const dy = Math.max(0, curRect.top - candRect.bottom);
+              const dx = Math.abs(candCenterX - curCenterX);
+              score = dy * 2.5 + dx * 0.85;
             }
             break;
           }
@@ -267,42 +383,51 @@ export function useTvSpatialNavigation(enabled = true) {
       }
 
       if (bestCandidate) {
-        bestCandidate.focus();
-        lastActiveElementRef.current = bestCandidate;
-
-        // Smooth scroll horizontally and vertically
-        // If parent has overflow-x auto, scroll inside it
-        const scrollContainer = bestCandidate.closest('.overflow-x-auto');
-        if (scrollContainer && (direction === 'left' || direction === 'right')) {
-          bestCandidate.scrollIntoView({
-            behavior: 'smooth',
-            block: 'nearest',
-            inline: 'center',
-          });
-        } else {
-          bestCandidate.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
-            inline: 'nearest',
-          });
-        }
+        focusElementSmoothly(bestCandidate, direction);
       }
     },
-    [getNavigableElements]
+    [getNavigableElements, focusElementSmoothly, focusPrimaryElement]
   );
+
+  // Prevent any embedded iframe from stealing remote focus away from the application UI
+  useEffect(() => {
+    if (!enabled) return;
+
+    const reclaimFocusFromIframe = () => {
+      const active = document.activeElement;
+      if (active && active.tagName === 'IFRAME') {
+        (active as HTMLElement).blur();
+        const fallback = lastActiveElementRef.current;
+        if (fallback && document.body.contains(fallback)) {
+          fallback.focus({ preventScroll: true });
+        } else {
+          focusPrimaryElement();
+        }
+      }
+    };
+
+    window.addEventListener('blur', reclaimFocusFromIframe);
+    const interval = setInterval(reclaimFocusFromIframe, 600);
+    return () => {
+      window.removeEventListener('blur', reclaimFocusFromIframe);
+      clearInterval(interval);
+    };
+  }, [enabled, focusPrimaryElement]);
 
   useEffect(() => {
     if (!enabled) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      const isInput =
+      const isTextInput =
         target &&
-        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) &&
+        (target as HTMLInputElement).type !== 'range';
 
-      // In input fields, only ArrowDown leaves the input to go into the grid
-      if (isInput) {
-        if (e.key === 'ArrowDown') {
+      const keyCode = e.keyCode || e.which;
+
+      if (isTextInput) {
+        if (e.key === 'ArrowDown' || keyCode === 40) {
           e.preventDefault();
           target.blur();
           navigateDirection('down');
@@ -310,41 +435,63 @@ export function useTvSpatialNavigation(enabled = true) {
         return;
       }
 
-      switch (e.key) {
-        case 'ArrowUp':
+      if (e.key === 'ArrowUp' || e.key === 'Up' || keyCode === 38 || keyCode === 19) {
+        e.preventDefault();
+        navigateDirection('up');
+      } else if (e.key === 'ArrowDown' || e.key === 'Down' || keyCode === 40 || keyCode === 20) {
+        e.preventDefault();
+        navigateDirection('down');
+      } else if (e.key === 'ArrowLeft' || e.key === 'Left' || keyCode === 37 || keyCode === 21) {
+        // Allow range slider to use Left/Right only if it has explicit data-tv-slider
+        if (
+          target &&
+          target.tagName === 'INPUT' &&
+          (target as HTMLInputElement).type === 'range'
+        ) {
+          return;
+        }
+        e.preventDefault();
+        navigateDirection('left');
+      } else if (e.key === 'ArrowRight' || e.key === 'Right' || keyCode === 39 || keyCode === 22) {
+        if (
+          target &&
+          target.tagName === 'INPUT' &&
+          (target as HTMLInputElement).type === 'range'
+        ) {
+          return;
+        }
+        e.preventDefault();
+        navigateDirection('right');
+      } else if (
+        e.key === 'Enter' ||
+        e.key === 'NumpadEnter' ||
+        e.key === 'Select' ||
+        e.key === 'Accept' ||
+        keyCode === 13 ||
+        keyCode === 23 ||
+        keyCode === 66
+      ) {
+        const active = document.activeElement as HTMLElement | null;
+        if (!active || active === document.body) {
           e.preventDefault();
-          navigateDirection('up');
-          break;
-        case 'ArrowDown':
+          focusPrimaryElement();
+          return;
+        }
+        if (
+          active.getAttribute('data-tv-card') === 'true' ||
+          active.getAttribute('role') === 'button' ||
+          active.tagName === 'BUTTON' ||
+          active.tagName === 'A'
+        ) {
           e.preventDefault();
-          navigateDirection('down');
-          break;
-        case 'ArrowLeft':
-          e.preventDefault();
-          navigateDirection('left');
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          navigateDirection('right');
-          break;
-        case 'Enter':
-        case 'NumpadEnter':
-          // If active element is a card without standard button behavior, trigger click
-          if (
-            target &&
-            (target.getAttribute('data-tv-card') === 'true' ||
-              target.getAttribute('role') === 'button')
-          ) {
-            e.preventDefault();
-            target.click();
-          }
-          break;
+          active.click();
+        }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enabled, navigateDirection]);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [enabled, navigateDirection, focusPrimaryElement]);
 
-  return { navigateDirection, getNavigableElements };
+  return { navigateDirection, getNavigableElements, focusPrimaryElement };
 }

@@ -103,6 +103,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             <button
               onClick={() => onPlay(current)}
               data-tv-nav="true"
+              data-tv-autofocus="true"
               className="tv-focus flex items-center justify-center gap-2 px-5 sm:px-7 py-2.5 sm:py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-base shadow-lg shadow-amber-500/25 transition-transform active:scale-95 shrink-0"
             >
               <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-slate-950" />

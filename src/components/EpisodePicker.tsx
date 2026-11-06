@@ -29,7 +29,11 @@ export const EpisodePicker: React.FC<EpisodePickerProps> = ({
   const episodes = episodesMap[selectedSeason] || [];
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4"
+    >
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Modal Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between gap-4">
@@ -42,9 +46,11 @@ export const EpisodePicker: React.FC<EpisodePickerProps> = ({
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
+            data-tv-nav="true"
             className="tv-focus p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700"
-            title="Close"
+            title="Close (Back)"
           >
             <X className="w-5 h-5" />
           </button>
@@ -57,8 +63,10 @@ export const EpisodePicker: React.FC<EpisodePickerProps> = ({
               const active = s === selectedSeason;
               return (
                 <button
+                  type="button"
                   key={s}
                   onClick={() => setSelectedSeason(s)}
+                  data-tv-nav="true"
                   className={`tv-focus px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl whitespace-nowrap shrink-0 transition-all ${
                     active
                       ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20'
@@ -86,11 +94,14 @@ export const EpisodePicker: React.FC<EpisodePickerProps> = ({
 
                 return (
                   <button
+                    type="button"
                     key={`${selectedSeason}-${ep.episode}`}
                     onClick={() => {
                       onSelectEpisode(selectedSeason, ep.episode);
                       onClose();
                     }}
+                    data-tv-nav="true"
+                    data-tv-autofocus={isPlaying ? 'true' : undefined}
                     className={`tv-focus group flex flex-col p-3 rounded-xl border text-left transition-all ${
                       isPlaying
                         ? 'bg-amber-500/15 border-amber-500 text-white ring-1 ring-amber-500'

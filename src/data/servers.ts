@@ -203,12 +203,13 @@ export const STREAM_SERVERS: StreamServer[] = [
     badge: 'Videasy 1080p/4K',
     quality: '4K / 1080p Original HD',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1, startAt = 0 }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const progressParam = startAt > 0 ? `&progress=${Math.floor(startAt)}&startAt=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://player.videasy.net/movie/${targetId}?autoPlay=true&color=f59e0b`;
+        return `https://player.videasy.net/movie/${targetId}?autoPlay=true&color=f59e0b${progressParam}`;
       }
-      return `https://player.videasy.net/tv/${targetId}/${season}/${episode}?autoPlay=true&color=f59e0b&nextEpisode=true&episodeSelector=true`;
+      return `https://player.videasy.net/tv/${targetId}/${season}/${episode}?autoPlay=true&color=f59e0b&nextEpisode=true&episodeSelector=true${progressParam}`;
     },
   },
   {
@@ -217,12 +218,23 @@ export const STREAM_SERVERS: StreamServer[] = [
     badge: 'VidLink 4K/1080p',
     quality: '4K / 1080p Original',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({
+      type,
+      id,
+      imdbId,
+      tmdbId,
+      season = 1,
+      episode = 1,
+      quality = '1080p',
+      startAt = 0,
+    }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const qParam = quality && quality !== 'auto' ? `&quality=${quality}` : '';
+      const startParam = startAt > 0 ? `&startAt=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://vidlink.pro/movie/${targetId}?primaryColor=f59e0b&nextbutton=true&autoplay=true`;
+        return `https://vidlink.pro/movie/${targetId}?primaryColor=f59e0b&nextbutton=true&autoplay=true${qParam}${startParam}`;
       }
-      return `https://vidlink.pro/tv/${targetId}/${season}/${episode}?primaryColor=f59e0b&nextbutton=true&autoplay=true`;
+      return `https://vidlink.pro/tv/${targetId}/${season}/${episode}?primaryColor=f59e0b&nextbutton=true&autoplay=true${qParam}${startParam}`;
     },
   },
   {
@@ -231,12 +243,13 @@ export const STREAM_SERVERS: StreamServer[] = [
     badge: 'VidFast Multi-Audio',
     quality: '1080p Full HD',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1, startAt = 0 }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `&startAt=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://vidfast.pro/movie/${targetId}?autoPlay=true&theme=f59e0b`;
+        return `https://vidfast.pro/movie/${targetId}?autoPlay=true&theme=f59e0b${startParam}`;
       }
-      return `https://vidfast.pro/tv/${targetId}/${season}/${episode}?autoPlay=true&theme=f59e0b&nextButton=true&autoNext=true`;
+      return `https://vidfast.pro/tv/${targetId}/${season}/${episode}?autoPlay=true&theme=f59e0b&nextButton=true&autoNext=true${startParam}`;
     },
   },
   {
@@ -245,12 +258,13 @@ export const STREAM_SERVERS: StreamServer[] = [
     badge: 'VidSrc API 1',
     quality: '1080p Full HD',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1, startAt = 0 }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `&startAt=${Math.floor(startAt)}&t=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://vidsrc.wtf/api/1/movie/?id=${targetId}&color=f59e0b`;
+        return `https://vidsrc.wtf/api/1/movie/?id=${targetId}&color=f59e0b${startParam}`;
       }
-      return `https://vidsrc.wtf/api/1/tv/?id=${targetId}&s=${season}&e=${episode}&color=f59e0b`;
+      return `https://vidsrc.wtf/api/1/tv/?id=${targetId}&s=${season}&e=${episode}&color=f59e0b${startParam}`;
     },
   },
   {
@@ -259,12 +273,13 @@ export const STREAM_SERVERS: StreamServer[] = [
     badge: 'VidSrc API 2 (Multi-Audio)',
     quality: '1080p Multi-Audio',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1, startAt = 0 }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `&startAt=${Math.floor(startAt)}&t=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://vidsrc.wtf/api/2/movie/?id=${targetId}&color=f59e0b`;
+        return `https://vidsrc.wtf/api/2/movie/?id=${targetId}&color=f59e0b${startParam}`;
       }
-      return `https://vidsrc.wtf/api/2/tv/?id=${targetId}&s=${season}&e=${episode}&color=f59e0b`;
+      return `https://vidsrc.wtf/api/2/tv/?id=${targetId}&s=${season}&e=${episode}&color=f59e0b${startParam}`;
     },
   },
   {
@@ -273,12 +288,13 @@ export const STREAM_SERVERS: StreamServer[] = [
     badge: 'VidSrc API 3',
     quality: '1080p HD',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1, startAt = 0 }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `&startAt=${Math.floor(startAt)}&t=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://vidsrc.wtf/api/3/movie/?id=${targetId}`;
+        return `https://vidsrc.wtf/api/3/movie/?id=${targetId}${startParam}`;
       }
-      return `https://vidsrc.wtf/api/3/tv/?id=${targetId}&s=${season}&e=${episode}`;
+      return `https://vidsrc.wtf/api/3/tv/?id=${targetId}&s=${season}&e=${episode}${startParam}`;
     },
   },
   {
@@ -287,12 +303,13 @@ export const STREAM_SERVERS: StreamServer[] = [
     badge: 'AutoEmbed Multi-CDN',
     quality: '1080p Multi-Audio',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1, startAt = 0 }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `?startAt=${Math.floor(startAt)}&t=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://autoembed.co/movie/tmdb/${targetId}`;
+        return `https://autoembed.co/movie/tmdb/${targetId}${startParam}`;
       }
-      return `https://autoembed.co/tv/tmdb/${targetId}-${season}-${episode}`;
+      return `https://autoembed.co/tv/tmdb/${targetId}-${season}-${episode}${startParam}`;
     },
   },
   {
@@ -301,12 +318,13 @@ export const STREAM_SERVERS: StreamServer[] = [
     badge: 'SuperEmbed VIP',
     quality: '1080p HD VIP',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1, startAt = 0 }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `&start=${Math.floor(startAt)}&t=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://multiembed.mov/directstream.php?video_id=${targetId}&tmdb=1`;
+        return `https://multiembed.mov/directstream.php?video_id=${targetId}&tmdb=1${startParam}`;
       }
-      return `https://multiembed.mov/directstream.php?video_id=${targetId}&tmdb=1&s=${season}&e=${episode}`;
+      return `https://multiembed.mov/directstream.php?video_id=${targetId}&tmdb=1&s=${season}&e=${episode}${startParam}`;
     },
   },
   {
@@ -315,12 +333,13 @@ export const STREAM_SERVERS: StreamServer[] = [
     badge: 'VidSrc.cc V2',
     quality: '1080p Full HD',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1, startAt = 0 }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `&startAt=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://vidsrc.cc/v2/embed/movie/${targetId}?autoPlay=true`;
+        return `https://vidsrc.cc/v2/embed/movie/${targetId}?autoPlay=true${startParam}`;
       }
-      return `https://vidsrc.cc/v2/embed/tv/${targetId}/${season}/${episode}?autoPlay=true`;
+      return `https://vidsrc.cc/v2/embed/tv/${targetId}/${season}/${episode}?autoPlay=true${startParam}`;
     },
   },
   {
@@ -329,12 +348,13 @@ export const STREAM_SERVERS: StreamServer[] = [
     badge: 'VidSrc.icu HD',
     quality: '1080p Full HD',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1, startAt = 0 }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `?startAt=${Math.floor(startAt)}&t=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://vidsrc.icu/embed/movie/${targetId}`;
+        return `https://vidsrc.icu/embed/movie/${targetId}${startParam}`;
       }
-      return `https://vidsrc.icu/embed/tv/${targetId}/${season}/${episode}`;
+      return `https://vidsrc.icu/embed/tv/${targetId}/${season}/${episode}${startParam}`;
     },
   },
   {
@@ -343,12 +363,13 @@ export const STREAM_SERVERS: StreamServer[] = [
     badge: 'NontonGo Proxy',
     quality: '1080p Full HD',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1, startAt = 0 }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `?startAt=${Math.floor(startAt)}&t=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://www.nontongo.win/embed/movie/${targetId}`;
+        return `https://www.nontongo.win/embed/movie/${targetId}${startParam}`;
       }
-      return `https://www.nontongo.win/embed/tv/${targetId}/${season}/${episode}`;
+      return `https://www.nontongo.win/embed/tv/${targetId}/${season}/${episode}${startParam}`;
     },
   },
   {
@@ -357,12 +378,13 @@ export const STREAM_SERVERS: StreamServer[] = [
     badge: '2Embed HD',
     quality: '1080p / 720p HD',
     supportsQualityParam: true,
-    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
+    buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1, startAt = 0 }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
+      const startParam = startAt > 0 ? `&t=${Math.floor(startAt)}` : '';
       if (type === 'movie') {
-        return `https://www.2embed.cc/embed/${targetId}`;
+        return `https://www.2embed.cc/embed/${targetId}${startAt > 0 ? `?t=${Math.floor(startAt)}` : ''}`;
       }
-      return `https://www.2embed.cc/embedtv/${targetId}&s=${season}&e=${episode}`;
+      return `https://www.2embed.cc/embedtv/${targetId}&s=${season}&e=${episode}${startParam}`;
     },
   },
 ];
