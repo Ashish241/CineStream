@@ -229,9 +229,9 @@ export const STREAM_SERVERS: StreamServer[] = [
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
       const qParam = quality && quality !== 'auto' ? `&quality=${quality}` : '';
       if (type === 'movie') {
-        return `https://vidlink.pro/movie/${targetId}?primaryColor=f59e0b&autoplay=true${qParam}`;
+        return `https://vidlink.pro/movie/${targetId}?primaryColor=f59e0b&autoplay=true&title=false&poster=false${qParam}`;
       }
-      return `https://vidlink.pro/tv/${targetId}/${season}/${episode}?primaryColor=f59e0b&autoplay=true${qParam}`;
+      return `https://vidlink.pro/tv/${targetId}/${season}/${episode}?primaryColor=f59e0b&autoplay=true&title=false&poster=false${qParam}`;
     },
   },
   {
@@ -257,9 +257,9 @@ export const STREAM_SERVERS: StreamServer[] = [
     buildUrl: ({ type, id, imdbId, tmdbId, season = 1, episode = 1 }) => {
       const targetId = resolveTmdbId({ id, imdbId, tmdbId });
       if (type === 'movie') {
-        return `https://vidfast.pro/movie/${targetId}?autoPlay=true&theme=f59e0b`;
+        return `https://vidfast.pro/movie/${targetId}?autoPlay=true&theme=f59e0b&title=false&poster=false`;
       }
-      return `https://vidfast.pro/tv/${targetId}/${season}/${episode}?autoPlay=true&theme=f59e0b`;
+      return `https://vidfast.pro/tv/${targetId}/${season}/${episode}?autoPlay=true&theme=f59e0b&title=false&poster=false`;
     },
   },
   {

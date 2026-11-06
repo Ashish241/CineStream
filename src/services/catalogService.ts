@@ -1024,7 +1024,7 @@ const VERIFIED_YOUTUBE_FALLBACKS: Array<{
 ];
 
 function buildYouTubeEmbedUrl(videoId: string): string {
-  return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+  return `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&enablejsapi=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1`;
 }
 
 // Channels whose YouTube uploads disable 3rd-party iframe embedding (UNPLAYABLE_IN_EMBED)
@@ -1187,21 +1187,6 @@ export async function fetchDirectSerialStreams(
     if (!finalIds.has(s.id)) {
       finalIds.add(s.id);
       combined.push(s);
-    }
-  }
-
-  // Ultimate safety net for any brand-new Indian TV serial not yet in fallback list:
-  // append verified Sony SAB / Zee TV comedy & drama streams as backup mirrors so a serial NEVER fails to play
-  if (combined.length === 0) {
-    const universalSerialBackups = VERIFIED_YOUTUBE_FALLBACKS[3].videos; // TMKOC / Sony SAB HD
-    for (const v of universalSerialBackups) {
-      combined.push({
-        id: v.id,
-        title: `${title} - S${season}:E${episode} (Broadcast Stream)`,
-        embedUrl: buildYouTubeEmbedUrl(v.id),
-        duration: v.duration,
-        thumbnail: `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`,
-      });
     }
   }
 

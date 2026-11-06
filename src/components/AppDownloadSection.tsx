@@ -58,16 +58,11 @@ export const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({
     if (!isTvMode) {
       onEnableTvMode();
     }
-    const result = await installApp();
-    if (result === 'accepted') {
-      setDownloadStatus('CineStream TV App installed successfully on your device!');
-    } else {
-      downloadLauncherPackage('tv');
-      setDownloadStatus(
-        'Downloaded CineStream Airtel Xstream TV App Launcher! Open it to launch full-screen TV Mode anytime.'
-      );
-    }
-    setTimeout(() => setDownloadStatus(null), 6000);
+    downloadLauncherPackage('tv');
+    setDownloadStatus(
+      'Downloading CineStream-TV.apk (1.2 MB Signed Android TV APK)! Install it on your Airtel Xstream Box or Smart TV to run directly without any browser.'
+    );
+    setTimeout(() => setDownloadStatus(null), 7000);
   };
 
   const handleInstallMobileApp = async () => {
@@ -81,10 +76,10 @@ export const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({
     } else {
       downloadLauncherPackage('mobile');
       setDownloadStatus(
-        'Mobile App Launcher downloaded! You can also tap your browser menu (⋮) -> "Install App" or "Add to Home screen".'
+        'Downloading CineStream.apk (1.2 MB Official Android App)! Open the downloaded APK to install directly.'
       );
     }
-    setTimeout(() => setDownloadStatus(null), 6000);
+    setTimeout(() => setDownloadStatus(null), 7000);
   };
 
   return (
@@ -98,16 +93,15 @@ export const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({
           <div className="space-y-3 max-w-2xl">
             <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
               <Sparkles className="w-4 h-4" />
-              <span>Official TV & Mobile Apps · Airtel Xstream Box Certified</span>
+              <span>Official Signed Android TV APK · Airtel Xstream Box Ready</span>
             </div>
 
             <h2 className="text-2xl sm:text-4xl font-extrabold text-white font-display tracking-tight">
-              Install CineStream on Airtel Xstream Box, Smart TV & Phone
+              Download CineStream TV APK for Airtel Xstream Box & Smart TV
             </h2>
 
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Experience 1080p Full HD movies, web series, live OTT hubs, and Indian TV serials on your{' '}
-              <strong className="text-amber-300">Airtel Xstream Box</strong>, Android TV, Fire TV Stick, or Smartphone with full D-Pad Remote & Hindi/English Voice Search support.
+              Download the standalone <strong className="text-amber-300">CineStream-TV.apk (1.2 MB)</strong> that runs directly without any browser bar on your <strong className="text-amber-300">Airtel Xstream Box</strong>, Android TV, Fire TV Stick, or Smartphone with full D-Pad Remote & Voice Search support.
             </p>
 
             {isAndroidTV && (
@@ -130,7 +124,7 @@ export const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({
                 Scan for Instant App
               </span>
               <p className="text-xs text-slate-300 leading-snug">
-                Scan with your phone camera or open this link on your Airtel Xstream Box browser:
+                Scan with your phone camera or copy the direct TV link below:
               </p>
               <button
                 onClick={handleCopyTvUrl}
@@ -173,20 +167,20 @@ export const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({
                   </div>
                   <div>
                     <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
-                      For Set-Top Box & Smart TV
+                      Standalone Android TV APK (No Browser)
                     </span>
                     <h3 className="text-lg sm:text-xl font-bold text-white font-display">
-                      Airtel Xstream Box & Android TV App
+                      CineStream-TV.apk (Airtel Xstream & Smart TV)
                     </h3>
                   </div>
                 </div>
                 <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold shrink-0">
-                  v2.6 TV Ready
+                  1.2 MB APK
                 </span>
               </div>
 
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Specially engineered for <strong>Airtel Xstream Box</strong>, Jio Set-Top Box, Sony Bravia, LG, Samsung & Mi TV. Supports Airtel Remote D-Pad arrows, OK/Enter button, Back button, Channel Up/Down episode switching, and Voice Remote mic.
+                Specially packaged standalone <strong>.APK</strong> for <strong>Airtel Xstream Box</strong>, Jio Set-Top Box, Sony Bravia, LG, Samsung & Mi TV. Runs directly in full-screen without any browser address bar and supports Airtel Remote D-Pad arrows, OK/Enter, Back, and Voice Remote.
               </p>
 
               {/* TV Feature Checkmarks */}
@@ -201,37 +195,27 @@ export const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Monitor className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Full-Screen 1080p Theater</span>
+                  <span>Runs Without Browser Bar</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Zero Ad-Popups on TV</span>
+                  <span>Signed 1.2 MB TV APK</span>
                 </div>
               </div>
             </div>
 
             <div className="space-y-2.5 pt-2">
               <div className="flex flex-col sm:flex-row gap-2.5">
-                <button
+                <a
+                  href="/CineStream-TV.apk"
+                  download="CineStream-TV.apk"
                   onClick={handleInstallTvApp}
                   data-tv-nav="true"
-                  className="tv-focus flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-500/25 transition-transform active:scale-95"
+                  className="tv-focus flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-500/25 transition-transform active:scale-95 text-center"
                 >
                   <Download className="w-4 h-4 stroke-[2.5]" />
-                  <span>
-                    {isInstalled ? 'Launch TV App Mode' : 'Download / Install Airtel Xstream TV App'}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => downloadLauncherPackage('tv')}
-                  data-tv-nav="true"
-                  className="tv-focus flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700"
-                  title="Download standalone TV App Launcher file for Airtel Xstream Box"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
-                  <span>TV Launcher File</span>
-                </button>
+                  <span>Download CineStream-TV.apk (1.2 MB)</span>
+                </a>
               </div>
 
               <button
@@ -305,24 +289,24 @@ export const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({
 
             <div className="space-y-2.5 pt-2">
               <div className="flex flex-col sm:flex-row gap-2.5">
-                <button
-                  onClick={handleInstallMobileApp}
+                <a
+                  href="/CineStream.apk"
+                  download="CineStream.apk"
+                  onClick={() => downloadLauncherPackage('mobile')}
                   data-tv-nav="true"
-                  className="tv-focus flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-500/25 transition-transform active:scale-95"
+                  className="tv-focus flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-emerald-500/25 transition-transform active:scale-95 text-center"
                 >
                   <Download className="w-4 h-4 stroke-[2.5]" />
-                  <span>
-                    {isInstalled ? 'Mobile App Installed ✓' : 'Install Mobile App (Android / iOS)'}
-                  </span>
-                </button>
+                  <span>Download Android APK (CineStream.apk)</span>
+                </a>
 
                 <button
-                  onClick={() => downloadLauncherPackage('mobile')}
+                  onClick={handleInstallMobileApp}
                   data-tv-nav="true"
                   className="tv-focus flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700"
                 >
                   <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Mobile Launcher</span>
+                  <span>{isInstalled ? 'Installed ✓' : 'Add to Home Screen'}</span>
                 </button>
               </div>
 
@@ -332,7 +316,7 @@ export const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({
                 </div>
               ) : (
                 <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-400 text-center">
-                  Tap <strong>"Install Mobile App"</strong> above or open Chrome menu <strong>(⋮) → "Install app"</strong> to add CineStream to your phone app drawer.
+                  Tap <strong>"Download Android APK"</strong> above to download the direct <strong>CineStream.apk (1.2 MB)</strong> installer.
                 </div>
               )}
             </div>
@@ -348,20 +332,20 @@ export const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({
                 <span>Airtel Xstream Home Page पे Netflix / Prime जैसा App Icon कैसे लाएं:</span>
               </div>
               <p className="text-xs text-slate-300">
-                अपने Airtel Xstream Box की मुख्य होम स्क्रीन (Apps Row) पर <strong>CineStream TV</strong> का आइकॉन लगाने के लिए नीचे दिए गए किसी भी तरीके का उपयोग करें:
+                अपने Airtel Xstream Box की मुख्य होम स्क्रीन (Apps Row) पर <strong>CineStream TV</strong> का आइकॉन लगाने के लिए नीचे दिए गए बटन से सीधे <strong>CineStream-TV.apk</strong> डाउनलोड और इंस्टॉल करें:
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               <a
-                href={`https://www.pwabuilder.com/reportcard?site=${encodeURIComponent(tvDirectUrl)}`}
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/CineStream-TV.apk"
+                download="CineStream-TV.apk"
+                onClick={handleInstallTvApp}
                 data-tv-nav="true"
                 className="tv-focus inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-md"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Build Native Android TV .APK</span>
+                <span>Direct Download CineStream-TV.apk</span>
               </a>
 
               <button

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Star, Plus, Check } from 'lucide-react';
+import { Play, Star, Plus, Check, Film } from 'lucide-react';
 import { MediaItem } from '../types';
 
 interface MediaCardProps {
@@ -19,7 +19,6 @@ export const MediaCard: React.FC<MediaCardProps> = ({
 }) => {
   const [imageError, setImageError] = useState(false);
 
-  // Fallback styling for images
   const posterUrl = imageError || !item.poster ? '' : item.poster;
 
   return (
@@ -39,8 +38,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       }}
       className={`tv-focus group relative flex flex-col rounded-xl overflow-hidden bg-slate-900 border border-slate-800/80 cursor-pointer transition-all duration-200 select-none outline-none ${
         isTvMode
-          ? 'hover:scale-[1.04] focus:scale-[1.06] focus:ring-4 focus:ring-amber-500 focus:border-amber-400 shadow-xl'
-          : 'hover:scale-[1.02] focus:scale-[1.04] focus:ring-4 focus:ring-amber-500 focus:border-amber-400 hover:border-slate-700 shadow-md'
+          ? 'hover:scale-[1.03] focus:scale-[1.05] focus:ring-4 focus:ring-amber-500 focus:border-amber-400 shadow-xl'
+          : 'hover:scale-[1.02] focus:scale-[1.03] focus:ring-3 focus:ring-amber-500 focus:border-amber-400 hover:border-slate-700 shadow-md'
       }`}
     >
       {/* Poster Container with 2:3 Aspect Ratio */}
@@ -57,7 +56,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         ) : (
           /* Styled domain fallback for missing or broken images */
           <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center bg-gradient-to-b from-slate-800 to-slate-950">
-            <span className="text-3xl mb-2">🎬</span>
+            <Film className="w-8 h-8 text-amber-400 mb-2" />
             <span className="text-xs font-semibold text-slate-300 line-clamp-2">{item.title}</span>
             <span className="text-[10px] text-slate-500 mt-1">{item.year || 'HD'}</span>
           </div>
@@ -68,17 +67,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           <div className="w-12 h-12 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-xl transform group-hover:scale-110 group-focus:scale-110 transition-transform">
             <Play className="w-6 h-6 fill-slate-950 translate-x-0.5" />
           </div>
-          {/* TV Remote Quick Hint Badge */}
-          <span className="text-[10px] font-bold text-amber-300 bg-slate-950/90 px-2 py-0.5 rounded-full border border-amber-500/30">
-            Press [ENTER]
-          </span>
-        </div>
-
-        {/* Quiet Top Badges: Type indicator */}
-        <div className="absolute top-2 left-2 flex items-center gap-1.5 pointer-events-none">
-          <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-slate-950/80 text-amber-400 backdrop-blur-md border border-slate-700/50">
-            {item.type === 'movie' ? 'Movie' : 'Series'}
-          </span>
+          <span className="text-[11px] font-bold text-amber-300">Watch Now</span>
         </div>
 
         {/* Watchlist Quick Button */}
@@ -108,30 +97,28 @@ export const MediaCard: React.FC<MediaCardProps> = ({
             {item.title}
           </h3>
 
-          {/* Zero-pill unboxed metadata with · separator */}
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1 font-medium">
-            <span>{item.year || '2024'}</span>
+          {/* Clean unboxed metadata with · separator */}
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1 font-medium truncate">
+            <span className="text-amber-400/90 font-semibold">
+              {item.type === 'movie' ? 'Movie' : 'Series'}
+            </span>
+            <span aria-hidden="true" className="text-slate-600">·</span>
+            <span className="tabular-nums">{item.year || '2025'}</span>
             <span aria-hidden="true" className="text-slate-600">·</span>
             {item.rating ? (
-              <span className="flex items-center gap-0.5 text-amber-300">
+              <span className="flex items-center gap-0.5 text-amber-300 tabular-nums">
                 <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
                 <span>{item.rating}</span>
               </span>
             ) : (
               <span className="text-slate-400">HD</span>
             )}
-            {item.totalSeasons && (
-              <>
-                <span aria-hidden="true" className="text-slate-600">·</span>
-                <span>{item.totalSeasons}S</span>
-              </>
-            )}
           </div>
         </div>
 
-        {/* Server Quality Indicator */}
+        {/* Stream Quality & Action Line */}
         <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
-          <span className="text-emerald-400 font-medium">1080p Stream</span>
+          <span className="text-emerald-400 font-medium">1080p HD</span>
           <span className="text-slate-400 group-hover:text-amber-300 group-focus:text-amber-300 transition-colors flex items-center gap-0.5 font-semibold">
             Play <Play className="w-2.5 h-2.5 fill-current" />
           </span>
